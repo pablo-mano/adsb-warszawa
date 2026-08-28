@@ -18,7 +18,6 @@ const MapComponent = dynamic(() => import('./components/MapComponent'), {
 export default function Home() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,8 +32,6 @@ export default function Home() {
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Wystąpił błąd');
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -63,48 +60,40 @@ export default function Home() {
         </div>
       </header>
 
-      {loading && (
-        <div className="flex-1 flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <div className="text-4xl mb-4">✈️</div>
-            <div className="text-gray-600">Ładowanie danych...</div>
-          </div>
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        {/* Map - Primary view */}
+        <div className="relative flex-1 min-h-0 min-w-0 h-[70vh] lg:h-full">
+          {error && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg max-w-md">
+              <div className="font-semibold">Błąd</div>
+              <div className="text-sm">{error}</div>
+            </div>
+          )}
+          <MapComponent
+            aircraft={aircraft}
+            selectedAircraft={selectedAircraft}
+            onSelectAircraft={handleSelectAircraft}
+          />
         </div>
-      )}
 
-      {error && (
-        <div className="flex-1 flex items-center justify-center bg-gray-50">
-          <div className="text-center text-red-600">
-            <div className="text-4xl mb-4">⚠️</div>
-            <div className="font-semibold">Błąd</div>
-            <div className="text-sm mt-2">{error}</div>
-          </div>
-        </div>
-      )}
-
-      {!loading && !error && (
-        <div className="flex-1 flex overflow-hidden">
-          <div className="w-80 flex-shrink-0">
+        {/* Sidebar - List and Detail */}
+        <div className="flex-shrink-0 w-full lg:w-96 h-[30vh] lg:h-full flex flex-col lg:flex-row border-t lg:border-t-0 lg:border-l border-gray-200 overflow-hidden">
+          <div className="flex-1 lg:flex-shrink-0 lg:w-full overflow-y-auto">
             <FlightList
               aircraft={aircraft}
               selectedAircraft={selectedAircraft}
               onSelectAircraft={handleSelectAircraft}
             />
           </div>
-          <div className="flex-1">
-            <MapComponent
-              aircraft={aircraft}
-              selectedAircraft={selectedAircraft}
-              onSelectAircraft={handleSelectAircraft}
-            />
-          </div>
-          <div className="w-80 flex-shrink-0 border-l border-gray-200">
-            <FlightDetail aircraft={selectedAircraft} />
-          </div>
+          {selectedAircraft && (
+            <div className="hidden lg:block lg:w-80 border-l border-gray-200 overflow-y-auto">
+              <FlightDetail aircraft={selectedAircraft} />
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <footer className="bg-gray-100 border-t border-gray-200 p-3 text-center text-sm text-gray-600">
+      <footer className="bg-gray-100 border-t border-gray-200 p-3 text-center text-sm text-gray-600 flex-shrink-0">
         Dane z{' '}
         <a
           href="https://adsb.fi/"
