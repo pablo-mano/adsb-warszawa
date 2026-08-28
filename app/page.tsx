@@ -8,8 +8,8 @@ import { Aircraft } from './components/MapComponent';
 const MapComponent = dynamic(() => import('./components/MapComponent'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-      <div className="text-gray-500">Ładowanie mapy...</div>
+    <div className="w-full h-full flex items-center justify-center bg-zinc-100">
+      <div className="text-zinc-500">Ładowanie mapy...</div>
     </div>
   ),
 });
@@ -45,30 +45,32 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header with single counter */}
-      <header className="bg-blue-600 text-white shadow-lg flex-shrink-0">
-        <div className="p-3 md:p-4 flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg md:text-2xl font-bold truncate">ADS-B Warszawa</h1>
-            <p className="text-xs md:text-sm opacity-90 hidden md:block">Mapa lotów wokół EPWA (80 NM)</p>
-          </div>
-          <div className="flex-shrink-0 text-right">
-            <div className="text-2xl md:text-3xl font-bold">{aircraft.length}</div>
+    <div className="h-screen flex flex-col bg-zinc-50">
+      {/* Thin header bar - title + live count */}
+      <header className="bg-white border-b border-zinc-200 flex-shrink-0">
+        <div className="px-4 py-2.5 flex items-center justify-between gap-3">
+          <h1 className="text-base md:text-lg font-semibold text-gray-900">
+            ADS-B Warszawa
+          </h1>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
+            <span className="text-sm md:text-base font-medium text-gray-900">
+              {aircraft.length}
+            </span>
           </div>
         </div>
       </header>
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red-100 border-b border-red-400 text-red-700 px-3 py-2 text-center text-sm flex-shrink-0">
-          <span className="font-semibold">Błąd:</span> {error}
+        <div className="bg-red-50 border-b border-red-200 text-red-700 px-4 py-2 text-sm flex-shrink-0">
+          <span className="font-medium">Błąd:</span> {error}
         </div>
       )}
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Map - fills remaining space on desktop, ~55vh on mobile */}
+        {/* Map - fills remaining space */}
         <div className="flex-1 min-h-0 min-w-0 h-[55vh] md:h-full">
           <MapComponent
             aircraft={aircraft}
@@ -77,8 +79,8 @@ export default function Home() {
           />
         </div>
 
-        {/* List - 340px fixed width on desktop, below map on mobile */}
-        <div className="flex-1 md:flex-none md:w-[340px] border-t md:border-t-0 md:border-l border-gray-200 overflow-hidden">
+        {/* List - quiet card/column, 340px on desktop */}
+        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-t md:border-t-0 border-zinc-200 overflow-hidden">
           <FlightList
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
@@ -88,17 +90,17 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-gray-100 border-t border-gray-200 p-2 md:p-3 text-center text-xs md:text-sm text-gray-600 flex-shrink-0">
+      <footer className="bg-white border-t border-zinc-200 px-4 py-2 text-center text-xs text-zinc-600 flex-shrink-0">
         Dane z{' '}
         <a
           href="https://adsb.fi/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline font-medium"
+          className="text-zinc-900 hover:underline font-medium"
         >
           adsb.fi
         </a>
-        {' '}• Wyłącznie do użytku niekomercyjnego
+        {' '}• niekomercyjnie
       </footer>
     </div>
   );
