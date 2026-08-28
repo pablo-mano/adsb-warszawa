@@ -9,7 +9,7 @@ import { Aircraft } from './components/MapComponent';
 const MapComponent = dynamic(() => import('./components/MapComponent'), {
   ssr: false,
   loading: () => (
-    <div className="h-full flex items-center justify-center bg-gray-100">
+    <div className="adsb-map flex items-center justify-center bg-gray-100">
       <div className="text-gray-500">Ładowanie mapy...</div>
     </div>
   ),
@@ -60,15 +60,15 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-        {/* Map - Primary view */}
-        <div className="relative flex-1 min-h-0 min-w-0 h-[70vh] lg:h-full">
-          {error && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded shadow-lg max-w-md">
-              <div className="font-semibold">Błąd</div>
-              <div className="text-sm">{error}</div>
-            </div>
-          )}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 text-center">
+          <div className="font-semibold">Błąd: {error}</div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Map FIRST in DOM - Primary view */}
+        <div className="adsb-map">
           <MapComponent
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
@@ -76,20 +76,13 @@ export default function Home() {
           />
         </div>
 
-        {/* Sidebar - List and Detail */}
-        <div className="flex-shrink-0 w-full lg:w-96 h-[30vh] lg:h-full flex flex-col lg:flex-row border-t lg:border-t-0 lg:border-l border-gray-200 overflow-hidden">
-          <div className="flex-1 lg:flex-shrink-0 lg:w-full overflow-y-auto">
-            <FlightList
-              aircraft={aircraft}
-              selectedAircraft={selectedAircraft}
-              onSelectAircraft={handleSelectAircraft}
-            />
-          </div>
-          {selectedAircraft && (
-            <div className="hidden lg:block lg:w-80 border-l border-gray-200 overflow-y-auto">
-              <FlightDetail aircraft={selectedAircraft} />
-            </div>
-          )}
+        {/* List below map */}
+        <div className="flex-shrink-0 border-t border-gray-200 overflow-y-auto bg-white" style={{ maxHeight: '30vh' }}>
+          <FlightList
+            aircraft={aircraft}
+            selectedAircraft={selectedAircraft}
+            onSelectAircraft={handleSelectAircraft}
+          />
         </div>
       </div>
 

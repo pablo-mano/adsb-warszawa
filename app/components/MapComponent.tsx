@@ -55,7 +55,8 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
     <MapContainer
       center={[52.1657, 20.9671]}
       zoom={9}
-      style={{ height: '100%', width: '100%' }}
+      style={{ height: '70vh', minHeight: '480px', width: '100%' }}
+      className="adsb-map"
       zoomControl={true}
     >
       <TileLayer
