@@ -54,7 +54,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -65,11 +65,10 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
       center={[52.1657, 20.9671]}
       zoom={9}
       style={{ 
-        height: isMobile ? '55vh' : '70vh', 
-        minHeight: isMobile ? '320px' : '480px', 
+        height: isMobile ? '55vh' : '100%',
+        minHeight: isMobile ? '320px' : '100%',
         width: '100%' 
       }}
-      className={isMobile ? 'adsb-map-mobile' : 'adsb-map'}
       zoomControl={true}
     >
       <TileLayer
