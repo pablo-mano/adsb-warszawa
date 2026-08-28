@@ -9,7 +9,7 @@ import { Aircraft } from './components/MapComponent';
 const MapComponent = dynamic(() => import('./components/MapComponent'), {
   ssr: false,
   loading: () => (
-    <div className="adsb-map-mobile md:adsb-map flex items-center justify-center bg-gray-100">
+    <div className="flex items-center justify-center bg-gray-100" style={{ height: '55vh', minHeight: '320px' }}>
       <div className="text-gray-500">Ładowanie mapy...</div>
     </div>
   ),
@@ -69,7 +69,7 @@ export default function Home() {
 
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Map - ~55vh on mobile, ~70vh on desktop */}
-        <div className="adsb-map-mobile md:adsb-map flex-shrink-0">
+        <div className="flex-shrink-0">
           <MapComponent
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
