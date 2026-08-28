@@ -65,7 +65,7 @@ async function fetchWithRateLimit(url: string): Promise<Response> {
   });
 }
 
-function normalizeAircraft(raw: RawAircraft, now: number): NormalizedAircraft | null {
+function normalizeAircraft(raw: RawAircraft, nowSeconds: number): NormalizedAircraft | null {
   if (!raw.hex || typeof raw.lat !== 'number' || typeof raw.lon !== 'number') {
     return null;
   }
@@ -83,7 +83,7 @@ function normalizeAircraft(raw: RawAircraft, now: number): NormalizedAircraft | 
     alt = raw.alt_baro;
   }
 
-  const ts = typeof raw.seen_pos === 'number' ? now - raw.seen_pos : undefined;
+  const ts = typeof raw.seen_pos === 'number' ? Math.floor(nowSeconds - raw.seen_pos) : undefined;
   const track = raw.track !== undefined ? raw.track : raw.true_heading;
 
   return {
@@ -121,11 +121,13 @@ export async function GET() {
 
       const data = await response.json();
       const aircraft: RawAircraft[] = data.ac || data.aircraft || [];
-      const now: number = data.now || Math.floor(Date.now() / 1000);
+      
+      const nowRaw: number = data.now || Date.now();
+      const nowSeconds = nowRaw >= 1e12 ? Math.floor(nowRaw / 1000) : Math.floor(nowRaw);
       const source = endpoint.includes('adsb.fi') ? 'adsb.fi' : 'adsb.lol';
 
       const normalized = aircraft
-        .map(ac => normalizeAircraft(ac, now))
+        .map(ac => normalizeAircraft(ac, nowSeconds))
         .filter((a): a is NormalizedAircraft => a !== null);
 
       return NextResponse.json(
@@ -133,7 +135,7 @@ export async function GET() {
           aircraft: normalized, 
           count: normalized.length,
           source,
-          now
+          now: nowSeconds
         },
         {
           headers: {
