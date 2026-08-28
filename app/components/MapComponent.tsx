@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -51,12 +51,25 @@ function SelectedAircraftView({ aircraft }: { aircraft: Aircraft }) {
 }
 
 export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft }: MapComponentProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <MapContainer
       center={[52.1657, 20.9671]}
       zoom={9}
-      style={{ height: '70vh', minHeight: '480px', width: '100%' }}
-      className="adsb-map"
+      style={{ 
+        height: isMobile ? '55vh' : '70vh', 
+        minHeight: isMobile ? '320px' : '480px', 
+        width: '100%' 
+      }}
+      className={isMobile ? 'adsb-map-mobile' : 'adsb-map'}
       zoomControl={true}
     >
       <TileLayer
@@ -72,14 +85,12 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             click: () => onSelectAircraft(ac),
           }}
         >
-          <Popup>
-            <div className="text-sm">
+          <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
+            <div className="text-xs">
               <div className="font-bold">{ac.callsign || ac.hex}</div>
-              {ac.reg && <div>Rej: {ac.reg}</div>}
-              {ac.alt !== undefined && <div>Wys: {ac.alt} ft</div>}
-              {ac.gs !== undefined && <div>Prędkość: {ac.gs} kt</div>}
+              {ac.alt !== undefined && !ac.onGround && <div>{ac.alt} ft</div>}
             </div>
-          </Popup>
+          </Tooltip>
         </Marker>
       ))}
       {selectedAircraft && <SelectedAircraftView aircraft={selectedAircraft} />}
