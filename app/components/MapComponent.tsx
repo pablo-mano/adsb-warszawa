@@ -30,16 +30,25 @@ interface MapComponentProps {
 }
 
 // Guard Leaflet usage for SSR/first load
-const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false) => {
+const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, isMobile: boolean = false) => {
   try {
     // Dynamic import L only on client
     const L = require('leaflet');
     const color = isSelected ? '#ef4444' : '#3b82f6';
+    
+    // Responsive icon sizes
+    // Mobile <768: 24px default, 32px selected
+    // Desktop ≥768: 32px default, 40px selected
+    const size = isMobile 
+      ? (isSelected ? 32 : 24) 
+      : (isSelected ? 40 : 32);
+    const anchor = size / 2; // Center anchor
+    
     return L.divIcon({
-      html: `<div style="transform: rotate(${rotation}deg); color: ${color}; font-size: 24px;">✈</div>`,
+      html: `<div style="transform: rotate(${rotation}deg); color: ${color}; font-size: ${size}px;">✈</div>`,
       className: 'aircraft-marker',
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      iconSize: [size, size],
+      iconAnchor: [anchor, anchor],
     });
   } catch (error) {
     console.error('Error creating aircraft icon:', error);
@@ -122,7 +131,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
         />
         {aircraft.map((ac) => {
           try {
-            const icon = createAircraftIcon(ac.track || 0, selectedAircraft?.hex === ac.hex);
+            const icon = createAircraftIcon(ac.track || 0, selectedAircraft?.hex === ac.hex, isMobile);
             return (
               <Marker
                 key={ac.hex}
