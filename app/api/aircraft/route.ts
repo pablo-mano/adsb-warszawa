@@ -11,12 +11,14 @@ interface RawAircraft {
   alt_geom?: number;
   gs?: number;
   track?: number;
+  true_heading?: number;
   lat?: number;
   lon?: number;
   seen?: number;
+  seen_pos?: number;
   type?: string;
   squawk?: string;
-  timestamp?: number;
+  dst?: number;
 }
 
 interface NormalizedAircraft {
@@ -63,7 +65,7 @@ async function fetchWithRateLimit(url: string): Promise<Response> {
   });
 }
 
-function normalizeAircraft(raw: RawAircraft): NormalizedAircraft | null {
+function normalizeAircraft(raw: RawAircraft, now: number): NormalizedAircraft | null {
   if (!raw.hex || typeof raw.lat !== 'number' || typeof raw.lon !== 'number') {
     return null;
   }
@@ -81,6 +83,9 @@ function normalizeAircraft(raw: RawAircraft): NormalizedAircraft | null {
     alt = raw.alt_baro;
   }
 
+  const ts = typeof raw.seen_pos === 'number' ? now - raw.seen_pos : undefined;
+  const track = raw.track !== undefined ? raw.track : raw.true_heading;
+
   return {
     hex: raw.hex,
     callsign: raw.flight?.trim(),
@@ -88,22 +93,24 @@ function normalizeAircraft(raw: RawAircraft): NormalizedAircraft | null {
     lon: raw.lon,
     alt,
     altGeom: raw.alt_geom,
-    track: raw.track,
+    track,
     gs: raw.gs,
-    ts: raw.timestamp,
+    ts,
     onGround,
     squawk: raw.squawk,
     reg: raw.r,
     typeCode: raw.t,
     src: raw.type,
     seen: raw.seen,
+    dstNm: raw.dst,
   };
 }
 
 export async function GET() {
   let lastError: Error | null = null;
 
-  for (const endpoint of ENDPOINTS) {
+  for (let i = 0; i < ENDPOINTS.length; i++) {
+    const endpoint = ENDPOINTS[i];
     try {
       const response = await fetchWithRateLimit(endpoint);
 
@@ -114,13 +121,20 @@ export async function GET() {
 
       const data = await response.json();
       const aircraft: RawAircraft[] = data.ac || data.aircraft || [];
+      const now: number = data.now || Math.floor(Date.now() / 1000);
+      const source = endpoint.includes('adsb.fi') ? 'adsb.fi' : 'adsb.lol';
 
       const normalized = aircraft
-        .map(normalizeAircraft)
+        .map(ac => normalizeAircraft(ac, now))
         .filter((a): a is NormalizedAircraft => a !== null);
 
       return NextResponse.json(
-        { aircraft: normalized, count: normalized.length },
+        { 
+          aircraft: normalized, 
+          count: normalized.length,
+          source,
+          now
+        },
         {
           headers: {
             'Cache-Control': 'public, s-maxage=2, stale-while-revalidate=3',
