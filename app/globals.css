@@ -17,8 +17,23 @@ body {
   height: 100%;
 }
 
+/* Desktop map size */
 .adsb-map {
   height: 70vh;
   min-height: 480px;
   width: 100%;
+}
+
+/* Mobile map size - ~55vh to leave room for list */
+.adsb-map-mobile {
+  height: 55vh;
+  min-height: 320px;
+  width: 100%;
+}
+
+/* Hide Leaflet popups on mobile to prevent map blocking */
+@media (max-width: 768px) {
+  .leaflet-popup {
+    display: none !important;
+  }
 }

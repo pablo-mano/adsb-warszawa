@@ -9,7 +9,7 @@ import { Aircraft } from './components/MapComponent';
 const MapComponent = dynamic(() => import('./components/MapComponent'), {
   ssr: false,
   loading: () => (
-    <div className="adsb-map flex items-center justify-center bg-gray-100">
+    <div className="adsb-map-mobile md:adsb-map flex items-center justify-center bg-gray-100">
       <div className="text-gray-500">Ładowanie mapy...</div>
     </div>
   ),
@@ -47,28 +47,29 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col">
-      <header className="bg-blue-600 text-white p-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">ADS-B Warszawa</h1>
-            <p className="text-sm opacity-90">Mapa lotów wokół EPWA (80 NM)</p>
+      {/* Compact header - single row on mobile, two rows on desktop */}
+      <header className="bg-blue-600 text-white shadow-lg flex-shrink-0">
+        <div className="p-3 md:p-4 flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg md:text-2xl font-bold truncate">ADS-B Warszawa</h1>
+            <p className="text-xs md:text-sm opacity-90 hidden md:block">Mapa lotów wokół EPWA (80 NM)</p>
           </div>
-          <div className="text-right">
-            <div className="text-sm opacity-90">Samolotów w zasięgu:</div>
-            <div className="text-3xl font-bold">{aircraft.length}</div>
+          <div className="flex-shrink-0 text-right">
+            <div className="text-xs md:text-sm opacity-90 md:block hidden">Samolotów w zasięgu:</div>
+            <div className="text-2xl md:text-3xl font-bold">{aircraft.length}</div>
           </div>
         </div>
       </header>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 text-center">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 text-center text-sm flex-shrink-0">
           <div className="font-semibold">Błąd: {error}</div>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Map FIRST in DOM - Primary view */}
-        <div className="adsb-map">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* Map - ~55vh on mobile, ~70vh on desktop */}
+        <div className="adsb-map-mobile md:adsb-map flex-shrink-0">
           <MapComponent
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
@@ -76,8 +77,8 @@ export default function Home() {
           />
         </div>
 
-        {/* List below map */}
-        <div className="flex-shrink-0 border-t border-gray-200 overflow-y-auto bg-white" style={{ maxHeight: '30vh' }}>
+        {/* List - takes remaining space (~1/3 on mobile) */}
+        <div className="flex-1 border-t border-gray-200 overflow-y-auto bg-white min-h-0">
           <FlightList
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
@@ -86,7 +87,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="bg-gray-100 border-t border-gray-200 p-3 text-center text-sm text-gray-600 flex-shrink-0">
+      <footer className="bg-gray-100 border-t border-gray-200 p-2 md:p-3 text-center text-xs md:text-sm text-gray-600 flex-shrink-0">
         Dane z{' '}
         <a
           href="https://adsb.fi/"
