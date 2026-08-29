@@ -24,6 +24,7 @@ export default function Home() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTrail, setSelectedTrail] = useState<TrailPoint[]>([]);
   const trailHistoryRef = useRef<Map<string, TrailPoint[]>>(new Map());
 
   useEffect(() => {
@@ -66,6 +67,45 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!selectedAircraft) {
+      setSelectedTrail([]);
+      return;
+    }
+
+    const fetchTrail = async () => {
+      try {
+        const now = Math.floor(Date.now() / 1000);
+        const from = now - 3600;
+        const response = await fetch(`/api/aircraft/${selectedAircraft.hex}/trail?from=${from}`);
+        if (!response.ok) {
+          throw new Error('Trail fetch failed');
+        }
+        const data = await response.json();
+        const apiPoints = data.points || [];
+        
+        // If API returns points, use them (DB is source of truth)
+        // If API returns empty, fallback to session buffer
+        if (apiPoints.length > 0) {
+          setSelectedTrail(apiPoints);
+        } else {
+          const sessionTrail = trailHistoryRef.current.get(selectedAircraft.hex) || [];
+          setSelectedTrail(sessionTrail);
+        }
+      } catch (err) {
+        console.error('Error fetching trail:', err);
+        // Fallback to session buffer if API fails
+        const sessionTrail = trailHistoryRef.current.get(selectedAircraft.hex) || [];
+        setSelectedTrail(sessionTrail);
+      }
+    };
+
+    fetchTrail();
+    const interval = setInterval(fetchTrail, 2500);
+
+    return () => clearInterval(interval);
+  }, [selectedAircraft]);
+
   const handleSelectAircraft = (aircraft: Aircraft) => {
     setSelectedAircraft(aircraft);
   };
@@ -102,7 +142,7 @@ export default function Home() {
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
             onSelectAircraft={handleSelectAircraft}
-            selectedTrail={selectedAircraft ? trailHistoryRef.current.get(selectedAircraft.hex) || [] : []}
+            selectedTrail={selectedTrail}
           />
         </div>
 
