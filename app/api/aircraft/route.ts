@@ -158,6 +158,13 @@ export async function GET() {
           count: normalized.length,
           source,
           now: nowSeconds
+        },
+        {
+          headers: {
+            'Cache-Control': 'public, s-maxage=2',
+            'CDN-Cache-Control': 'public, s-maxage=2',
+            'Vercel-CDN-Cache-Control': 'public, s-maxage=2',
+          },
         }
       );
     } catch (error) {
@@ -172,6 +179,7 @@ export async function GET() {
       status: 503,
       headers: {
         'Cache-Control': 'no-store',
+        'Vercel-CDN-Cache-Control': 'no-store',
       },
     }
   );

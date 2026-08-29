@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
             key: 'Cache-Control',
             value: 'public, s-maxage=2',
           },
+          {
+            key: 'CDN-Cache-Control',
+            value: 'public, s-maxage=2',
+          },
+          {
+            key: 'Vercel-CDN-Cache-Control',
+            value: 'public, s-maxage=2',
+          },
         ],
       },
     ];
