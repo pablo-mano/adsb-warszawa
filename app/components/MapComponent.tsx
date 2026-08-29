@@ -107,8 +107,13 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
       : (isSelected ? 40 : 32);
     const anchor = size / 2; // Center anchor
     
+    // SVG airplane pointing UP (north) at 0° rotation
+    const svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${rotation}deg);">
+      <path fill="${color}" d="M12 2 L13.5 9 L21 10 L13.5 11 L12 22 L10.5 11 L3 10 L10.5 9 Z"/>
+    </svg>`;
+    
     return L.divIcon({
-      html: `<div style="transform: rotate(${rotation}deg); color: ${color}; font-size: ${size}px;">✈</div>`,
+      html: svg,
       className: 'aircraft-marker',
       iconSize: [size, size],
       iconAnchor: [anchor, anchor],
