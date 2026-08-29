@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
 
 export interface Aircraft {
   hex: string;
@@ -27,6 +28,7 @@ interface TrailPoint {
   lat: number;
   lon: number;
   ts: number;
+  alt: number | null;
 }
 
 interface MapComponentProps {
@@ -136,6 +138,57 @@ function SelectedAircraftView({ aircraft }: { aircraft: Aircraft }) {
     }
   }, [aircraft, map]);
   
+  return null;
+}
+
+// Desktop altitude legend component
+function AltitudeLegend() {
+  const map = useMap();
+  const legendRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!map || typeof window === 'undefined') return;
+
+    try {
+      // Dynamic Leaflet Control import
+      const L = require('leaflet');
+      
+      const LegendControl = L.Control.extend({
+        onAdd: function() {
+          const div = L.DomUtil.create('div', 'altitude-legend');
+          legendRef.current = div;
+          
+          div.style.background = 'white';
+          div.style.padding = '6px 8px';
+          div.style.borderRadius = '4px';
+          div.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+          div.style.fontSize = '11px';
+          div.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+          
+          const gradient = getAltitudeLegendGradient();
+          div.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="color: #666; font-weight: 500;">0</span>
+              <div style="width: 100px; height: 8px; background: ${gradient}; border-radius: 2px;"></div>
+              <span style="color: #666; font-weight: 500;">40k</span>
+            </div>
+          `;
+          
+          return div;
+        }
+      });
+
+      const legendControl = new LegendControl({ position: 'bottomleft' });
+      legendControl.addTo(map);
+
+      return () => {
+        legendControl.remove();
+      };
+    } catch (error) {
+      console.error('Error creating altitude legend:', error);
+    }
+  }, [map]);
+
   return null;
 }
 
@@ -249,27 +302,26 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           }
         })}
         {selectedAircraft && <SelectedAircraftView aircraft={selectedAircraft} />}
+        {selectedAircraft && selectedTrail.length >= 2 && !isMobile && <AltitudeLegend />}
         {selectedTrail.length >= 2 && (() => {
           try {
-            const now = Math.floor(Date.now() / 1000);
             const positions: [number, number][] = selectedTrail.map(p => [p.lat, p.lon]);
             const lineWeight = isMobile ? 1.5 : 2;
             
             const segments = [];
             for (let i = 0; i < positions.length - 1; i++) {
               const point = selectedTrail[i];
-              const age = now - point.ts;
-              const maxAge = 3600;
-              const opacity = Math.max(0.2, 1 - (age / maxAge) * 0.8);
+              // Color by altitude of the segment's starting point
+              const color = colorByAlt(point.alt);
               
               segments.push(
                 <Polyline
                   key={`trail-${i}`}
                   positions={[positions[i], positions[i + 1]]}
                   pathOptions={{
-                    color: '#ef4444',
+                    color: color,
                     weight: lineWeight,
-                    opacity: opacity,
+                    opacity: 1,
                   }}
                 />
               );
