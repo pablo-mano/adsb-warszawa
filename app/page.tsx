@@ -25,6 +25,10 @@ export default function Home() {
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedTrail, setSelectedTrail] = useState<TrailPoint[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [militaryEnabled, setMilitaryEnabled] = useState<boolean>(false);
+  const [militaryHexes, setMilitaryHexes] = useState<Set<string>>(new Set());
+  const [militaryLoaded, setMilitaryLoaded] = useState<boolean>(false);
   const trailHistoryRef = useRef<Map<string, TrailPoint[]>>(new Map());
 
   useEffect(() => {
@@ -66,6 +70,34 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!militaryEnabled) {
+      setMilitaryLoaded(false);
+      return;
+    }
+
+    const fetchMilitary = async () => {
+      try {
+        const response = await fetch('/api/mil');
+        if (!response.ok) {
+          throw new Error('Military data fetch failed');
+        }
+        const data = await response.json();
+        setMilitaryHexes(new Set(data.hexes || []));
+        setMilitaryLoaded(true);
+      } catch (err) {
+        console.error('Error fetching military data:', err);
+        setMilitaryHexes(new Set());
+        setMilitaryLoaded(true);
+      }
+    };
+
+    fetchMilitary();
+    const interval = setInterval(fetchMilitary, 45000);
+
+    return () => clearInterval(interval);
+  }, [militaryEnabled]);
 
   useEffect(() => {
     if (!selectedAircraft) {
@@ -110,6 +142,40 @@ export default function Home() {
     setSelectedAircraft(aircraft);
   };
 
+  // Filter aircraft based on search and military
+  const filteredAircraft = aircraft.filter((ac) => {
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = 
+        (ac.hex && ac.hex.toLowerCase().includes(query)) ||
+        (ac.callsign && ac.callsign.toLowerCase().includes(query)) ||
+        (ac.reg && ac.reg.toLowerCase().includes(query)) ||
+        (ac.typeCode && ac.typeCode.toLowerCase().includes(query));
+      
+      if (!matchesSearch) {
+        return false;
+      }
+    }
+
+    // Apply military filter
+    if (militaryEnabled && militaryLoaded) {
+      if (!militaryHexes.has(ac.hex.toLowerCase())) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Deselect aircraft if it's no longer in the filtered set
+  useEffect(() => {
+    if (selectedAircraft && !filteredAircraft.some(ac => ac.hex === selectedAircraft.hex)) {
+      setSelectedAircraft(null);
+      setSelectedTrail([]);
+    }
+  }, [filteredAircraft, selectedAircraft]);
+
   return (
     <div className="h-screen flex flex-col bg-zinc-50">
       {/* Thin header bar - title + live count */}
@@ -121,7 +187,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
             <span className="text-sm md:text-base font-medium text-gray-900">
-              {aircraft.length}
+              {filteredAircraft.length}
             </span>
           </div>
         </div>
@@ -139,7 +205,7 @@ export default function Home() {
         {/* Map - fills remaining space */}
         <div className="flex-1 min-h-0 min-w-0 h-[55vh] md:h-full">
           <MapComponent
-            aircraft={aircraft}
+            aircraft={filteredAircraft}
             selectedAircraft={selectedAircraft}
             onSelectAircraft={handleSelectAircraft}
             selectedTrail={selectedTrail}
@@ -150,9 +216,15 @@ export default function Home() {
         {/* List - quiet card/column, 340px on desktop */}
         <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-t md:border-t-0 border-zinc-200 overflow-hidden">
           <FlightList
-            aircraft={aircraft}
+            aircraft={filteredAircraft}
             selectedAircraft={selectedAircraft}
             onSelectAircraft={handleSelectAircraft}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            militaryEnabled={militaryEnabled}
+            onMilitaryToggle={() => setMilitaryEnabled(!militaryEnabled)}
+            militaryLoaded={militaryLoaded}
+            hasSearchQuery={searchQuery.trim().length > 0}
           />
         </div>
       </div>
