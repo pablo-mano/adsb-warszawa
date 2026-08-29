@@ -195,8 +195,13 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
         />
         {aircraft.map((ac) => {
           try {
-            // Compute heading from trail history
-            const points = trailHistory.get(ac.hex) || [];
+            // For selected aircraft: use selectedTrail (API data) when available, otherwise session buffer
+            // For all other aircraft: use session buffer
+            const isSelected = selectedAircraft?.hex === ac.hex;
+            const points = (isSelected && selectedTrail.length >= 2) 
+              ? selectedTrail 
+              : (trailHistory.get(ac.hex) || []);
+            
             let heading: number | null = calculateAircraftHeading(points);
             
             // Store successful heading for fallback
@@ -209,7 +214,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             
             // Apply rotation: glyph ✈ points NE naturally, so rotation = heading - 45
             const rotation = heading - 45;
-            const icon = createAircraftIcon(rotation, selectedAircraft?.hex === ac.hex, isMobile);
+            const icon = createAircraftIcon(rotation, isSelected, isMobile);
             return (
               <Marker
                 key={ac.hex}
