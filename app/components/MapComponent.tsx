@@ -212,8 +212,8 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
               heading = lastKnownHeadingRef.current.get(ac.hex) ?? 0;
             }
             
-            // Apply rotation: glyph ✈ points NE naturally, so rotation = heading - 45
-            const rotation = heading - 45;
+            // Apply rotation: glyph ✈ points north at 0°
+            const rotation = heading;
             const icon = createAircraftIcon(rotation, isSelected, isMobile);
             return (
               <Marker
