@@ -82,7 +82,16 @@ export default function Home() {
           throw new Error('Trail fetch failed');
         }
         const data = await response.json();
-        setSelectedTrail(data.points || []);
+        const apiPoints = data.points || [];
+        
+        // If API returns points, use them (DB is source of truth)
+        // If API returns empty, fallback to session buffer
+        if (apiPoints.length > 0) {
+          setSelectedTrail(apiPoints);
+        } else {
+          const sessionTrail = trailHistoryRef.current.get(selectedAircraft.hex) || [];
+          setSelectedTrail(sessionTrail);
+        }
       } catch (err) {
         console.error('Error fetching trail:', err);
         // Fallback to session buffer if API fails
