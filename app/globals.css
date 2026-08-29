@@ -17,6 +17,11 @@ body {
   height: 100%;
 }
 
+/* Grayscale map tiles only, keep overlays (markers, trails) in full color */
+.leaflet-tile-pane {
+  filter: grayscale(100%);
+}
+
 /* Hide Leaflet popups on mobile to prevent map blocking */
 @media (max-width: 768px) {
   .leaflet-popup {
