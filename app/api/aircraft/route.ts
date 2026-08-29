@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { upsertPositions, purgeOldPositions, type PositionRow } from '@/app/lib/db';
 
-export const dynamic = 'force-dynamic';
-
 interface RawAircraft {
   hex?: string;
   r?: string;
@@ -160,11 +158,6 @@ export async function GET() {
           count: normalized.length,
           source,
           now: nowSeconds
-        },
-        {
-          headers: {
-            'Cache-Control': 'public, s-maxage=2',
-          },
         }
       );
     } catch (error) {
