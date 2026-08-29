@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import FlightList from './components/FlightList';
 import { Aircraft } from './components/MapComponent';
+import { getAltitudeLegendGradient } from './lib/colorByAlt';
 
 const MapComponent = dynamic(() => import('./components/MapComponent'), {
   ssr: false,
@@ -18,6 +19,7 @@ interface TrailPoint {
   lat: number;
   lon: number;
   ts: number;
+  alt: number | null;
 }
 
 export default function Home() {
@@ -52,8 +54,8 @@ export default function Home() {
             const history = trailHistoryRef.current.get(ac.hex) || [];
             const ts = ac.ts || now;
             
-            // Append new sample
-            history.push({ lat: ac.lat, lon: ac.lon, ts });
+            // Append new sample (include altitude for coloring)
+            history.push({ lat: ac.lat, lon: ac.lon, ts, alt: ac.alt ?? null });
             
             // Keep only samples from last hour
             const filtered = history.filter(point => point.ts >= oneHourAgo);
@@ -239,6 +241,15 @@ export default function Home() {
               </button>
             </div>
           </div>
+          {/* Mobile altitude legend - 4px bar when aircraft selected */}
+          {selectedAircraft && selectedTrail.length >= 2 && (
+            <div 
+              style={{ 
+                height: '4px', 
+                background: getAltitudeLegendGradient() 
+              }}
+            />
+          )}
         </div>
 
         {/* List - quiet card/column, 340px on desktop */}
