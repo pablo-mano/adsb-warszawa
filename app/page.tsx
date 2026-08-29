@@ -143,6 +143,7 @@ export default function Home() {
             selectedAircraft={selectedAircraft}
             onSelectAircraft={handleSelectAircraft}
             selectedTrail={selectedTrail}
+            trailHistory={trailHistoryRef.current}
           />
         </div>
 

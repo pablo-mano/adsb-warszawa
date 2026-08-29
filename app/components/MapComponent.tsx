@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -34,6 +34,62 @@ interface MapComponentProps {
   selectedAircraft: Aircraft | null;
   onSelectAircraft: (aircraft: Aircraft) => void;
   selectedTrail: TrailPoint[];
+  trailHistory: Map<string, TrailPoint[]>;
+}
+
+// Compute heading from two lat/lon points (returns degrees, 0° = north)
+function computeHeading(lat1: number, lon1: number, lat2: number, lon2: number): number | null {
+  // Skip if points are identical (zero distance)
+  if (lat1 === lat2 && lon1 === lon2) {
+    return null;
+  }
+  
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const θ = Math.atan2(y, x);
+  
+  return (θ * 180 / Math.PI + 360) % 360;
+}
+
+// Calculate heading for aircraft from trail points
+// Uses last segment if 2 points, or average of last 2 segments if ≥3 points
+function calculateAircraftHeading(points: TrailPoint[]): number | null {
+  if (points.length < 2) {
+    return null;
+  }
+  
+  if (points.length === 2) {
+    // Just use the last segment
+    return computeHeading(points[0].lat, points[0].lon, points[1].lat, points[1].lon);
+  }
+  
+  // ≥3 points: average of last TWO segments
+  const len = points.length;
+  const heading1 = computeHeading(
+    points[len - 3].lat, points[len - 3].lon,
+    points[len - 2].lat, points[len - 2].lon
+  );
+  const heading2 = computeHeading(
+    points[len - 2].lat, points[len - 2].lon,
+    points[len - 1].lat, points[len - 1].lon
+  );
+  
+  if (heading1 === null && heading2 === null) {
+    return null;
+  }
+  if (heading1 === null) return heading2;
+  if (heading2 === null) return heading1;
+  
+  // Average two headings (handling wrap-around)
+  let diff = heading2 - heading1;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  
+  return (heading1 + diff / 2 + 360) % 360;
 }
 
 // Guard Leaflet usage for SSR/first load
@@ -78,10 +134,11 @@ function SelectedAircraftView({ aircraft }: { aircraft: Aircraft }) {
   return null;
 }
 
-export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail }: MapComponentProps) {
+export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const lastKnownHeadingRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     setMounted(true);
@@ -138,7 +195,21 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
         />
         {aircraft.map((ac) => {
           try {
-            const icon = createAircraftIcon(ac.track || 0, selectedAircraft?.hex === ac.hex, isMobile);
+            // Compute heading from trail history
+            const points = trailHistory.get(ac.hex) || [];
+            let heading: number | null = calculateAircraftHeading(points);
+            
+            // Store successful heading for fallback
+            if (heading !== null) {
+              lastKnownHeadingRef.current.set(ac.hex, heading);
+            } else {
+              // Fallback to last known heading for this hex
+              heading = lastKnownHeadingRef.current.get(ac.hex) ?? 0;
+            }
+            
+            // Apply rotation: glyph ✈ points NE naturally, so rotation = heading - 45
+            const rotation = heading - 45;
+            const icon = createAircraftIcon(rotation, selectedAircraft?.hex === ac.hex, isMobile);
             return (
               <Marker
                 key={ac.hex}
