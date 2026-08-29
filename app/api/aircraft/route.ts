@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { upsertPositions, purgeOldPositions, type PositionRow } from '@/app/lib/db';
 
 export const revalidate = 2;
 
@@ -129,6 +130,29 @@ export async function GET() {
       const normalized = aircraft
         .map(ac => normalizeAircraft(ac, nowSeconds))
         .filter((a): a is NormalizedAircraft => a !== null);
+
+      // Upsert positions to DB (non-blocking, no failure propagation)
+      const positionsToStore: PositionRow[] = normalized
+        .filter(ac => ac.hex && ac.lat != null && ac.lon != null && ac.ts != null)
+        .map(ac => ({
+          hex: ac.hex,
+          ts: ac.ts!,
+          lat: ac.lat,
+          lon: ac.lon,
+          alt: ac.alt,
+          track: ac.track,
+          gs: ac.gs,
+          callsign: ac.callsign,
+        }));
+      
+      if (positionsToStore.length > 0) {
+        upsertPositions(positionsToStore).catch(err => 
+          console.error('Background DB write failed:', err)
+        );
+        purgeOldPositions().catch(err => 
+          console.error('Background DB purge failed:', err)
+        );
+      }
 
       return NextResponse.json(
         { 
