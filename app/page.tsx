@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import FlightList from './components/FlightList';
 import { Aircraft } from './components/MapComponent';
@@ -14,10 +14,17 @@ const MapComponent = dynamic(() => import('./components/MapComponent'), {
   ),
 });
 
+interface TrailPoint {
+  lat: number;
+  lon: number;
+  ts: number;
+}
+
 export default function Home() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([]);
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const trailHistoryRef = useRef<Map<string, TrailPoint[]>>(new Map());
 
   useEffect(() => {
     const fetchAircraft = async () => {
@@ -27,8 +34,27 @@ export default function Home() {
           throw new Error('Nie udało się pobrać danych');
         }
         const data = await response.json();
-        setAircraft(data.aircraft || []);
+        const aircraftData = data.aircraft || [];
+        setAircraft(aircraftData);
         setError(null);
+
+        // Update trail history for all aircraft with valid positions
+        const now = Math.floor(Date.now() / 1000);
+        const oneHourAgo = now - 3600;
+        
+        aircraftData.forEach((ac: Aircraft) => {
+          if (ac.hex && ac.lat != null && ac.lon != null) {
+            const history = trailHistoryRef.current.get(ac.hex) || [];
+            const ts = ac.ts || now;
+            
+            // Append new sample
+            history.push({ lat: ac.lat, lon: ac.lon, ts });
+            
+            // Keep only samples from last hour
+            const filtered = history.filter(point => point.ts >= oneHourAgo);
+            trailHistoryRef.current.set(ac.hex, filtered);
+          }
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Wystąpił błąd');
       }
@@ -76,6 +102,7 @@ export default function Home() {
             aircraft={aircraft}
             selectedAircraft={selectedAircraft}
             onSelectAircraft={handleSelectAircraft}
+            selectedTrail={selectedAircraft ? trailHistoryRef.current.get(selectedAircraft.hex) || [] : []}
           />
         </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 export interface Aircraft {
@@ -23,10 +23,17 @@ export interface Aircraft {
   dstNm?: number;
 }
 
+interface TrailPoint {
+  lat: number;
+  lon: number;
+  ts: number;
+}
+
 interface MapComponentProps {
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | null;
   onSelectAircraft: (aircraft: Aircraft) => void;
+  selectedTrail: TrailPoint[];
 }
 
 // Guard Leaflet usage for SSR/first load
@@ -71,7 +78,7 @@ function SelectedAircraftView({ aircraft }: { aircraft: Aircraft }) {
   return null;
 }
 
-export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft }: MapComponentProps) {
+export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail }: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -161,6 +168,37 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           }
         })}
         {selectedAircraft && <SelectedAircraftView aircraft={selectedAircraft} />}
+        {selectedTrail.length >= 2 && (() => {
+          try {
+            const now = Math.floor(Date.now() / 1000);
+            const positions: [number, number][] = selectedTrail.map(p => [p.lat, p.lon]);
+            const lineWeight = isMobile ? 1.5 : 2;
+            
+            const segments = [];
+            for (let i = 0; i < positions.length - 1; i++) {
+              const point = selectedTrail[i];
+              const age = now - point.ts;
+              const maxAge = 3600;
+              const opacity = Math.max(0.2, 1 - (age / maxAge) * 0.8);
+              
+              segments.push(
+                <Polyline
+                  key={`trail-${i}`}
+                  positions={[positions[i], positions[i + 1]]}
+                  pathOptions={{
+                    color: '#ef4444',
+                    weight: lineWeight,
+                    opacity: opacity,
+                  }}
+                />
+              );
+            }
+            return <>{segments}</>;
+          } catch (error) {
+            console.error('Error rendering trail:', error);
+            return null;
+          }
+        })()}
       </MapContainer>
     );
   } catch (error) {
