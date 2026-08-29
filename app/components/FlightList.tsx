@@ -12,6 +12,7 @@ interface FlightListProps {
   onMilitaryToggle: () => void;
   militaryLoaded: boolean;
   hasSearchQuery: boolean;
+  showToolbar?: boolean;
 }
 
 export default function FlightList({ 
@@ -23,7 +24,8 @@ export default function FlightList({
   militaryEnabled,
   onMilitaryToggle,
   militaryLoaded,
-  hasSearchQuery
+  hasSearchQuery,
+  showToolbar = true
 }: FlightListProps) {
   // Determine empty state message
   let emptyMessage = 'Brak samolotów w zasięgu';
@@ -35,32 +37,34 @@ export default function FlightList({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Search and Military Controls */}
-      <div className="flex-shrink-0 p-3 border-b border-zinc-200">
-        <div className="flex items-center gap-2">
-          {/* Search Input */}
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Callsign, hex, rej, typ"
-            className="flex-1 px-3 py-2 text-sm border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          
-          {/* Military Chip */}
-          <button
-            onClick={onMilitaryToggle}
-            className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
-              militaryEnabled
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-            }`}
-          >
-            Wojskowe
-          </button>
+    <div className="h-full flex flex-col min-h-0 overflow-hidden">
+      {/* Search and Military Controls - Desktop only */}
+      {showToolbar && (
+        <div className="hidden md:block flex-shrink-0 p-3 border-b border-zinc-200">
+          <div className="flex items-center gap-2">
+            {/* Search Input */}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Callsign, hex, rej, typ"
+              className="flex-1 px-3 py-2 text-sm border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            
+            {/* Military Chip */}
+            <button
+              onClick={onMilitaryToggle}
+              className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
+                militaryEnabled
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+              }`}
+            >
+              Wojskowe
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Aircraft List */}
       {aircraft.length === 0 ? (

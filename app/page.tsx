@@ -202,8 +202,11 @@ export default function Home() {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Map - fills remaining space */}
-        <div className="flex-1 min-h-0 min-w-0 h-[55vh] md:h-full">
+        {/* Desktop: Map + Sidebar row */}
+        {/* Mobile: Map → Toolbar → List column */}
+        
+        {/* Map - fills remaining space, clipped to its box */}
+        <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
           <MapComponent
             aircraft={filteredAircraft}
             selectedAircraft={selectedAircraft}
@@ -213,8 +216,33 @@ export default function Home() {
           />
         </div>
 
+        {/* Mobile Filter Toolbar - between map and list, normal flow */}
+        <div className="md:hidden flex-shrink-0 bg-white border-t border-zinc-200">
+          <div className="p-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Callsign, hex, rej, typ"
+                className="flex-1 px-3 py-2 text-sm border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                onClick={() => setMilitaryEnabled(!militaryEnabled)}
+                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
+                  militaryEnabled
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                }`}
+              >
+                Wojskowe
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* List - quiet card/column, 340px on desktop */}
-        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-t md:border-t-0 border-zinc-200 overflow-hidden">
+        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-zinc-200 min-h-0 overflow-hidden">
           <FlightList
             aircraft={filteredAircraft}
             selectedAircraft={selectedAircraft}
@@ -225,6 +253,7 @@ export default function Home() {
             onMilitaryToggle={() => setMilitaryEnabled(!militaryEnabled)}
             militaryLoaded={militaryLoaded}
             hasSearchQuery={searchQuery.trim().length > 0}
+            showToolbar={true}
           />
         </div>
       </div>
