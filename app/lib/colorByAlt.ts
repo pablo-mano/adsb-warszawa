@@ -95,6 +95,19 @@ function getLightnessForHue(hue: number): number {
 }
 
 /**
+ * Get air color for a given altitude (internal helper for legend)
+ * Always returns air color, never ground or unknown colors
+ * @param alt Altitude in feet
+ * @returns HSL color string
+ */
+function getAirColor(alt: number): string {
+  const hue = getHueForAltitude(alt);
+  const lightness = getLightnessForHue(hue);
+  const saturation = 88;
+  return `hsl(${hue.toFixed(1)},${saturation}%,${lightness.toFixed(1)}%)`;
+}
+
+/**
  * Get HSL color string for a given altitude
  * @param alt Altitude in feet (or null/undefined for unknown)
  * @returns HSL color string, e.g. "hsl(140,88%,41%)"
@@ -111,25 +124,22 @@ export function colorByAlt(alt: number | null | undefined): string {
   }
   
   // Air: calculate hue and lightness
-  const hue = getHueForAltitude(alt);
-  const lightness = getLightnessForHue(hue);
-  const saturation = 88; // Fixed saturation for air
-  
-  return `hsl(${hue.toFixed(1)},${saturation}%,${lightness.toFixed(1)}%)`;
+  return getAirColor(alt);
 }
 
 /**
  * Generate a CSS gradient string for the altitude legend (0 to 40k ft)
+ * Uses air colors only (no ground or unknown colors)
  * @returns CSS linear-gradient string
  */
 export function getAltitudeLegendGradient(): string {
   const steps: string[] = [];
   
-  // Sample the color ramp from 0 to 40000 ft
+  // Sample the AIR color ramp from 0 to 40000 ft
   const samples = 20;
   for (let i = 0; i <= samples; i++) {
     const alt = (i / samples) * 40000;
-    const color = colorByAlt(alt);
+    const color = getAirColor(alt);
     steps.push(color);
   }
   
