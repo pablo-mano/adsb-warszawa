@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { upsertPositions, purgeOldPositions, type PositionRow } from '@/app/lib/db';
 
-export const revalidate = 2;
+export const dynamic = 'force-dynamic';
 
 interface RawAircraft {
   hex?: string;
@@ -163,7 +163,7 @@ export async function GET() {
         },
         {
           headers: {
-            'Cache-Control': 'public, s-maxage=2, stale-while-revalidate=3',
+            'Cache-Control': 'public, s-maxage=2',
           },
         }
       );
@@ -175,6 +175,11 @@ export async function GET() {
 
   return NextResponse.json(
     { error: 'All endpoints failed', details: lastError?.message },
-    { status: 503 }
+    { 
+      status: 503,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    }
   );
 }
