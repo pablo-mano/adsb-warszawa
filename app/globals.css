@@ -38,3 +38,8 @@ body {
 .locate-control-button:disabled {
   cursor: default;
 }
+
+.airport-marker {
+  background: transparent !important;
+  border: none !important;
+}
