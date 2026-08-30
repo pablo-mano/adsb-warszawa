@@ -1,6 +1,7 @@
 'use client';
 
 import { Aircraft } from './MapComponent';
+import { typeDisplayName } from '../lib/aircraftTypes';
 
 interface FlightListProps {
   aircraft: Aircraft[];
@@ -88,7 +89,7 @@ export default function FlightList({
                   {ac.callsign || ac.hex}
                 </div>
                 <div className="text-xs text-zinc-600 mt-1 space-y-0.5">
-                  {ac.typeCode && <div>{ac.typeCode}</div>}
+                  {typeDisplayName(ac.typeCode) && <div className="truncate">{typeDisplayName(ac.typeCode)}</div>}
                   {ac.alt !== undefined && !ac.onGround ? (
                     <div>{ac.alt} ft • {ac.gs || 0} kt</div>
                   ) : ac.onGround ? (
