@@ -319,7 +319,7 @@ function FollowSelectedAircraft({ selectedAircraft }: { selectedAircraft: Aircra
       animate: true,
       duration: 0.25,
     });
-  }, [map, selectedAircraft?.hex, selectedAircraft?.lat, selectedAircraft?.lon]);
+  }, [map, selectedAircraft]);
 
   return null;
 }
