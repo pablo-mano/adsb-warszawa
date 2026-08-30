@@ -100,7 +100,6 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
   try {
     // Dynamic import L only on client
     const L = require('leaflet');
-    const color = isSelected ? '#ef4444' : '#3b82f6';
     
     // Responsive icon sizes
     // Mobile <768: 24px default, 32px selected
@@ -110,13 +109,11 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
       : (isSelected ? 40 : 32);
     const anchor = size / 2; // Center anchor
     
-    // SVG airplane pointing UP (north) at 0° rotation
-    const svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${rotation}deg);">
-      <path fill="${color}" d="M12 1.5 L16 4 L16.5 8 L21 10 L21 13 L16 13 L15.5 19 L17.5 20.5 L17.5 21.5 L12 22.5 L6.5 21.5 L6.5 20.5 L8.5 19 L8 13 L3 13 L3 10 L7.5 8 L8 4 Z"/>
-    </svg>`;
+    // Twemoji airplane glyph (U+2708) - faces upper-right / NE at 0°
+    const html = `<img src="/twemoji-2708.svg" width="${size}" height="${size}" style="transform: rotate(${rotation}deg); transform-origin: center center;" alt="✈" />`;
     
     return L.divIcon({
-      html: svg,
+      html: html,
       className: 'aircraft-marker',
       iconSize: [size, size],
       iconAnchor: [anchor, anchor],
@@ -271,8 +268,8 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
               heading = lastKnownHeadingRef.current.get(ac.hex) ?? 0;
             }
             
-            // Apply rotation: glyph ✈ points north at 0°
-            const rotation = heading;
+            // Apply rotation: Twemoji glyph faces upper-right / NE at 0°, so subtract 45°
+            const rotation = heading - 45;
             const icon = createAircraftIcon(rotation, isSelected, isMobile);
             return (
               <Marker
