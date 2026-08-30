@@ -5,14 +5,23 @@ import { EPWA_ATC } from '../lib/epwa';
 
 export type AtcStatus = 'idle' | 'loading' | 'playing' | 'error';
 
+function attachNoReferrer(audio: HTMLAudioElement) {
+  // LiveATC Icecast returns 403 when Referer is the Vercel production origin.
+  // Media requests must omit Referer; CORS mode is unnecessary for playback.
+  audio.setAttribute('referrerpolicy', 'no-referrer');
+  audio.removeAttribute('crossorigin');
+}
+
 export function useEpwaAtc() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const indexRef = useRef(0);
   const wantedRef = useRef(false);
+  const failoverLockRef = useRef(false);
   const [status, setStatus] = useState<AtcStatus>('idle');
 
   const stop = useCallback(() => {
     wantedRef.current = false;
+    failoverLockRef.current = false;
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -29,13 +38,17 @@ export function useEpwaAtc() {
       setStatus('error');
       return;
     }
+    failoverLockRef.current = false;
     indexRef.current = index;
     setStatus('loading');
+    attachNoReferrer(audio);
     audio.src = EPWA_ATC.streamUrls[index];
     void audio.play().catch(() => {
-      if (wantedRef.current) {
-        playFrom(index + 1);
-      }
+      if (!wantedRef.current) return;
+      if (failoverLockRef.current) return;
+      if (indexRef.current !== index) return;
+      failoverLockRef.current = true;
+      playFrom(index + 1);
     });
   }, []);
 
@@ -55,7 +68,10 @@ export function useEpwaAtc() {
   useEffect(() => {
     const audio = new Audio();
     audio.preload = 'none';
-    audio.crossOrigin = 'anonymous';
+    audio.hidden = true;
+    attachNoReferrer(audio);
+    audio.setAttribute('playsinline', '');
+    document.body.appendChild(audio);
     audioRef.current = audio;
 
     const onPlaying = () => {
@@ -67,6 +83,8 @@ export function useEpwaAtc() {
     };
     const onError = () => {
       if (!wantedRef.current) return;
+      if (failoverLockRef.current) return;
+      failoverLockRef.current = true;
       playFrom(indexRef.current + 1);
     };
 
@@ -82,6 +100,7 @@ export function useEpwaAtc() {
       audio.removeEventListener('playing', onPlaying);
       audio.removeEventListener('waiting', onWaiting);
       audio.removeEventListener('error', onError);
+      audio.remove();
     };
   }, [playFrom]);
 

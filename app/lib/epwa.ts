@@ -14,7 +14,9 @@ export const EPWA_ATC = {
   playlistUrl: 'https://www.liveatc.net/play/epwa_twr2.pls',
   listenPageUrl: 'https://www.liveatc.net/search/?icao=epwa',
   // LiveATC .pls (epwa_twr2) resolves to these Icecast mounts.
-  // www/d.liveatc.net is Cloudflare-protected; the stream hosts allow CORS *.
+  // www/d.liveatc.net is Cloudflare-protected. Stream hosts 403 when the
+  // browser sends Referer: https://adsb-warszawa.vercel.app/ — play with
+  // referrerPolicy=no-referrer (see AtcPlayer).
   streamUrls: [
     'https://s1-fmt2.liveatc.net/epwa_twr2',
     'https://s1-bos.liveatc.net/epwa_twr2',
