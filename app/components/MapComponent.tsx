@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { MapContainer, TileLayer, Marker, Tooltip, Polyline, Circle, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
 import { typeDisplayName } from '../lib/aircraftTypes';
@@ -153,8 +153,6 @@ const createAircraftIcon = (
   }
 };
 
-// Removed auto-panning: map stays where user left it
-
 // Desktop altitude legend component
 function AltitudeLegend() {
   const map = useMap();
@@ -305,10 +303,17 @@ function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void })
 }
 
 // Component to follow selected aircraft
-function FollowSelectedAircraft({ selectedAircraft }: { selectedAircraft: Aircraft | null }) {
+function FollowSelectedAircraft({
+  selectedAircraft,
+  suppressFollow,
+}: {
+  selectedAircraft: Aircraft | null;
+  suppressFollow: boolean;
+}) {
   const map = useMap();
 
   useEffect(() => {
+    if (suppressFollow) return;
     if (!map || !selectedAircraft || selectedAircraft.lat == null || selectedAircraft.lon == null) {
       return;
     }
@@ -319,9 +324,210 @@ function FollowSelectedAircraft({ selectedAircraft }: { selectedAircraft: Aircra
       animate: true,
       duration: 0.25,
     });
-  }, [map, selectedAircraft]);
+  }, [map, selectedAircraft, suppressFollow]);
 
   return null;
+}
+
+// User location types
+type LocationStatus = 'idle' | 'pending' | 'granted' | 'error';
+
+interface UserLocation {
+  lat: number;
+  lon: number;
+  accuracy: number;
+}
+
+interface LocateControlProps {
+  onLocationUpdate: (location: UserLocation | null) => void;
+  onStatusChange: (status: LocationStatus) => void;
+  isMobile: boolean;
+}
+
+function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateControlProps) {
+  const map = useMap();
+  const [status, setStatus] = useState<LocationStatus>('idle');
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const statusRef = useRef<LocationStatus>('idle');
+  const handleLocateRef = useRef<() => void>(() => {});
+  const [controlMounted, setControlMounted] = useState(false);
+
+  const updateStatus = useCallback((newStatus: LocationStatus) => {
+    statusRef.current = newStatus;
+    setStatus(newStatus);
+    onStatusChange(newStatus);
+  }, [onStatusChange]);
+
+  const handleLocate = useCallback(() => {
+    if (statusRef.current === 'pending') return;
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      onLocationUpdate(null);
+      updateStatus('error');
+      return;
+    }
+
+    updateStatus('pending');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location: UserLocation = {
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : 50,
+        };
+        onLocationUpdate(location);
+        updateStatus('granted');
+
+        // One-shot center on the user. Zoom in if needed so the accuracy
+        // ring is actually visible (at city-wide zoom it collapses to ~2px).
+        const L = require('leaflet');
+        const visibleRadius = Math.max(location.accuracy, 40);
+        const bounds = L.latLng(location.lat, location.lon).toBounds(visibleRadius * 2);
+        map.fitBounds(bounds.pad(0.8), { maxZoom: 16, animate: true });
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        onLocationUpdate(null);
+        updateStatus('error');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  }, [updateStatus, onLocationUpdate, map]);
+
+  handleLocateRef.current = handleLocate;
+
+  useEffect(() => {
+    if (!map || typeof window === 'undefined') return;
+
+    try {
+      const L = require('leaflet');
+
+      const LocateControlClass = L.Control.extend({
+        onAdd: function() {
+          const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+          const button = L.DomUtil.create('button', 'locate-control-button', container);
+          buttonRef.current = button as HTMLButtonElement;
+          button.type = 'button';
+          button.setAttribute('aria-label', 'Pokaż moją lokalizację');
+
+          // 44px on mobile (390px viewport), 34px on desktop
+          const size = isMobile ? 44 : 34;
+          button.style.width = `${size}px`;
+          button.style.height = `${size}px`;
+          button.style.background = 'white';
+          button.style.border = 'none';
+          button.style.borderRadius = '4px';
+          button.style.cursor = 'pointer';
+          button.style.display = 'flex';
+          button.style.alignItems = 'center';
+          button.style.justifyContent = 'center';
+          button.style.padding = '0';
+          button.style.transition = 'background-color 0.2s';
+
+          L.DomEvent.disableClickPropagation(button);
+          L.DomEvent.disableScrollPropagation(button);
+          L.DomEvent.on(button, 'click', (e: Event) => {
+            L.DomEvent.preventDefault(e);
+            handleLocateRef.current();
+          });
+
+          return container;
+        },
+        onRemove: function() {
+          if (buttonRef.current) {
+            L.DomEvent.off(buttonRef.current, 'click');
+          }
+        }
+      });
+
+      const control = new LocateControlClass({ position: 'topright' });
+      control.addTo(map);
+      setControlMounted(true);
+
+      return () => {
+        setControlMounted(false);
+        control.remove();
+      };
+    } catch (error) {
+      console.error('Error creating locate control:', error);
+    }
+  }, [map, isMobile]);
+
+  // Update button appearance based on status without remounting the control
+  useEffect(() => {
+    if (!buttonRef.current) return;
+
+    const button = buttonRef.current;
+    const iconSize = isMobile ? 22 : 18;
+
+    button.innerHTML = '';
+
+    if (status === 'error') {
+      button.style.backgroundColor = '#fee2e2';
+      button.disabled = false;
+      button.title = 'Brak zgody na lokalizację';
+      button.setAttribute('aria-label', 'Brak zgody na lokalizację');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: invert(15%) sepia(89%) saturate(5074%) hue-rotate(356deg) brightness(87%) contrast(93%);" alt="" />`;
+    } else if (status === 'pending') {
+      button.style.backgroundColor = '#e5e7eb';
+      button.disabled = true;
+      button.title = 'Pobieranie lokalizacji...';
+      button.setAttribute('aria-label', 'Pobieranie lokalizacji...');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: grayscale(100%);" alt="" />`;
+    } else if (status === 'granted') {
+      button.style.backgroundColor = 'white';
+      button.disabled = false;
+      button.title = 'Odśwież lokalizację';
+      button.setAttribute('aria-label', 'Odśwież lokalizację');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: invert(45%) sepia(88%) saturate(1945%) hue-rotate(202deg) brightness(101%) contrast(93%);" alt="" />`;
+    } else {
+      button.style.backgroundColor = 'white';
+      button.disabled = false;
+      button.title = 'Pokaż moją lokalizację';
+      button.setAttribute('aria-label', 'Pokaż moją lokalizację');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" alt="" />`;
+    }
+  }, [status, isMobile, controlMounted]);
+
+  return null;
+}
+
+function UserLocationLayer({ location }: { location: UserLocation }) {
+  const accuracy = Math.max(location.accuracy, 15);
+
+  return (
+    <>
+      <Circle
+        className="user-location-accuracy"
+        center={[location.lat, location.lon]}
+        radius={accuracy}
+        pathOptions={{
+          color: '#3b82f6',
+          fillColor: '#3b82f6',
+          fillOpacity: 0.15,
+          weight: 2,
+          opacity: 0.55,
+        }}
+      />
+      <CircleMarker
+        className="user-location-dot"
+        center={[location.lat, location.lon]}
+        radius={10}
+        pathOptions={{
+          color: '#ffffff',
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          weight: 3,
+          opacity: 1,
+        }}
+      />
+    </>
+  );
 }
 
 export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
@@ -331,6 +537,25 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
   const [labelsEnabled, setLabelsEnabled] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(9);
   const lastKnownHeadingRef = useRef<Map<string, number>>(new Map());
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [followSuppressed, setFollowSuppressed] = useState(false);
+
+  const handleLocationUpdate = useCallback((location: UserLocation | null) => {
+    setUserLocation(location);
+    if (location) {
+      // Keep follow-selected from yanking the map away from the one-shot GPS pan
+      setFollowSuppressed(true);
+    }
+  }, []);
+
+  const handleStatusChange = useCallback((_status: LocationStatus) => {
+    // Status is owned by LocateControl for the button; parent only needs coords.
+  }, []);
+
+  const handleSelectAircraft = useCallback((ac: Aircraft) => {
+    setFollowSuppressed(false);
+    onSelectAircraft(ac);
+  }, [onSelectAircraft]);
 
   useEffect(() => {
     setMounted(true);
@@ -385,6 +610,11 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Data: <a href="https://adsb.fi/">adsb.fi</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <LocateControl
+          onLocationUpdate={handleLocationUpdate}
+          onStatusChange={handleStatusChange}
+          isMobile={isMobile}
+        />
         {aircraft.map((ac) => {
           try {
             // For selected aircraft: use selectedTrail (API data) when available, otherwise session buffer
@@ -422,7 +652,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
                 eventHandlers={{
                   click: () => {
                     try {
-                      onSelectAircraft(ac);
+                      handleSelectAircraft(ac);
                     } catch (error) {
                       console.error('Error selecting aircraft:', error);
                     }
@@ -443,6 +673,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             return null;
           }
         })}
+        {userLocation && <UserLocationLayer location={userLocation} />}
         {selectedAircraft && selectedTrail.length >= 2 && !isMobile && <AltitudeLegend />}
         <ZoomTracker onZoomChange={setCurrentZoom} />
         <LabelControl 
@@ -450,7 +681,10 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           labelsEnabled={labelsEnabled} 
           onToggle={() => setLabelsEnabled(!labelsEnabled)} 
         />
-        <FollowSelectedAircraft selectedAircraft={selectedAircraft} />
+        <FollowSelectedAircraft
+          selectedAircraft={selectedAircraft}
+          suppressFollow={followSuppressed}
+        />
         {selectedTrail.length >= 2 && (() => {
           try {
             const positions: [number, number][] = selectedTrail.map(p => [p.lat, p.lon]);
