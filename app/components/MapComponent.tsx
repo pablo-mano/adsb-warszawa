@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Tooltip, Polyline, Circle, CircleMarke
 import 'leaflet/dist/leaflet.css';
 import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
 import { typeDisplayName } from '../lib/aircraftTypes';
+import { isEmergencySquawk } from '../lib/emergencySquawk';
 
 export interface Aircraft {
   hex: string;
@@ -126,7 +127,8 @@ const createAircraftIcon = (
   isSelected: boolean = false, 
   isMobile: boolean = false,
   label: string | null = null,
-  zoom: number = 9
+  zoom: number = 9,
+  isEmergency: boolean = false
 ) => {
   try {
     // Dynamic import L only on client
@@ -134,6 +136,13 @@ const createAircraftIcon = (
     
     const size = aircraftIconSize(isMobile, isSelected, zoom);
     const anchor = size / 2; // Center anchor
+    
+    // Emergency ring: 2px red border around the icon
+    const ringSize = size + 4; // 2px padding on each side
+    const ringStyle = isEmergency
+      ? `position: absolute; left: -2px; top: -2px; width: ${ringSize}px; height: ${ringSize}px; 
+         border: 2px solid #ff0000; border-radius: 50%; pointer-events: none;`
+      : '';
     
     // Label styling
     const labelFontSize = isMobile ? '10px' : '11px';
@@ -149,6 +158,7 @@ const createAircraftIcon = (
     // Wrap in a container div with position:relative so label can be absolutely positioned
     const html = `
       <div style="position: relative; width: ${size}px; height: ${size}px;">
+        ${isEmergency ? `<div style="${ringStyle}"></div>` : ''}
         <img src="/twemoji-2708.svg" width="${size}" height="${size}" 
              style="transform: rotate(${rotation}deg); transform-origin: center center; display: block;" alt="✈" />
         ${label ? `<span style="${labelStyle}">${label}</span>` : ''}
@@ -656,13 +666,25 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             // Apply rotation: Twemoji glyph faces upper-right / NE at 0°, so subtract 45°
             const rotation = heading - 45;
             
+            // Check if emergency squawk
+            const isEmergency = isEmergencySquawk(ac.squawk);
+            
             // Label logic:
             // - Always show for selected aircraft
             // - For others: only if labelsEnabled AND zoom >= 9
+            // - Emergency squawks: always show squawk code (independent of label toggle)
             const shouldShowLabel = isSelected || (labelsEnabled && currentZoom >= 9);
-            const labelText = shouldShowLabel ? (ac.callsign || ac.hex) : null;
+            let labelText: string | null = null;
             
-            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText, currentZoom);
+            if (isEmergency) {
+              // Emergency: always show squawk code, regardless of label toggle
+              labelText = ac.squawk!;
+            } else if (shouldShowLabel) {
+              // Non-emergency: show callsign/hex if labels are enabled
+              labelText = ac.callsign || ac.hex;
+            }
+            
+            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText, currentZoom, isEmergency);
             return (
               <Marker
                 key={ac.hex}
