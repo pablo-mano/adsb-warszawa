@@ -379,8 +379,12 @@ function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateCon
         onLocationUpdate(location);
         updateStatus('granted');
 
-        // One-shot pan to user location; do not watch or keep following
-        map.setView([location.lat, location.lon], map.getZoom());
+        // One-shot center on the user. Zoom in if needed so the accuracy
+        // ring is actually visible (at city-wide zoom it collapses to ~2px).
+        const L = require('leaflet');
+        const visibleRadius = Math.max(location.accuracy, 40);
+        const bounds = L.latLng(location.lat, location.lon).toBounds(visibleRadius * 2);
+        map.fitBounds(bounds.pad(0.8), { maxZoom: 16, animate: true });
       },
       (error) => {
         console.error('Geolocation error:', error);
@@ -513,7 +517,7 @@ function UserLocationLayer({ location }: { location: UserLocation }) {
       <CircleMarker
         className="user-location-dot"
         center={[location.lat, location.lon]}
-        radius={8}
+        radius={10}
         pathOptions={{
           color: '#ffffff',
           fillColor: '#3b82f6',
