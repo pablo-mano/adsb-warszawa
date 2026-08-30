@@ -2,6 +2,7 @@
 
 import { Aircraft } from './MapComponent';
 import { typeDisplayName } from '../lib/aircraftTypes';
+import { getEmergencyInfo } from '../lib/emergencySquawk';
 
 interface FlightDetailProps {
   aircraft: Aircraft;
@@ -9,6 +10,8 @@ interface FlightDetailProps {
 }
 
 export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
+  const emergencyInfo = getEmergencyInfo(aircraft.squawk);
+  
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header with X button */}
@@ -33,6 +36,13 @@ export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
 
       {/* Detail content */}
       <div className="flex-1 overflow-y-auto p-4">
+        {/* Emergency banner */}
+        {emergencyInfo && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded text-sm font-medium text-gray-900">
+            {emergencyInfo.code} · {emergencyInfo.description}
+          </div>
+        )}
+        
         <div className="space-y-3">
           <DetailRow label="Hex" value={aircraft.hex.toUpperCase()} />
           <DetailRow label="Rejestracja" value={aircraft.reg} />

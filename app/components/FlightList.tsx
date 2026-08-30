@@ -2,6 +2,7 @@
 
 import { Aircraft } from './MapComponent';
 import { typeDisplayName } from '../lib/aircraftTypes';
+import { isEmergencySquawk } from '../lib/emergencySquawk';
 
 interface FlightListProps {
   aircraft: Aircraft[];
@@ -101,27 +102,35 @@ export default function FlightList({
       ) : (
         <div className="flex-1 overflow-y-auto">
           <div className="divide-y divide-zinc-100">
-            {aircraft.map((ac) => (
-              <div
-                key={ac.hex}
-                onClick={() => onSelectAircraft(ac)}
-                className={`px-4 py-3 cursor-pointer hover:bg-zinc-50 transition-colors ${
-                  selectedAircraft?.hex === ac.hex ? 'bg-blue-50 border-l-2 border-blue-600' : ''
-                }`}
-              >
-                <div className="font-semibold text-gray-900 text-sm">
-                  {ac.callsign || ac.hex}
+            {aircraft.map((ac) => {
+              const isEmergency = isEmergencySquawk(ac.squawk);
+              return (
+                <div
+                  key={ac.hex}
+                  onClick={() => onSelectAircraft(ac)}
+                  className={`px-4 py-3 cursor-pointer hover:bg-zinc-50 transition-colors ${
+                    selectedAircraft?.hex === ac.hex 
+                      ? 'bg-blue-50 border-l-2 border-blue-600' 
+                      : isEmergency
+                      ? 'bg-red-500/10'
+                      : ''
+                  }`}
+                >
+                  <div className="font-semibold text-gray-900 text-sm">
+                    {ac.callsign || ac.hex}
+                    {isEmergency && ac.squawk && `  ${ac.squawk}`}
+                  </div>
+                  <div className="text-xs text-zinc-600 mt-1 space-y-0.5">
+                    {typeDisplayName(ac.typeCode) && <div className="truncate">{typeDisplayName(ac.typeCode)}</div>}
+                    {ac.alt !== undefined && !ac.onGround ? (
+                      <div>{ac.alt} ft • {ac.gs || 0} kt</div>
+                    ) : ac.onGround ? (
+                      <div className="text-orange-600">Na ziemi</div>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="text-xs text-zinc-600 mt-1 space-y-0.5">
-                  {typeDisplayName(ac.typeCode) && <div className="truncate">{typeDisplayName(ac.typeCode)}</div>}
-                  {ac.alt !== undefined && !ac.onGround ? (
-                    <div>{ac.alt} ft • {ac.gs || 0} kt</div>
-                  ) : ac.onGround ? (
-                    <div className="text-orange-600">Na ziemi</div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

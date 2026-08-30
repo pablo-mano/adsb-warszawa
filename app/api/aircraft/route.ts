@@ -138,6 +138,14 @@ export async function GET() {
         .map(ac => normalizeAircraft(ac, nowSeconds))
         .filter((a): a is NormalizedAircraft => a !== null);
 
+      // PREVIEW-ONLY: Override one aircraft with emergency squawk 7700 for testing
+      if (process.env.VERCEL_ENV === 'preview' && normalized.length > 0) {
+        normalized[0] = {
+          ...normalized[0],
+          squawk: '7700',
+        };
+      }
+
       scheduleRouteLookups(
         normalized
           .filter((ac) => isFlightCallsign(ac.callsign, ac.reg))
