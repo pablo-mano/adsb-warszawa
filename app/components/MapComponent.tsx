@@ -128,7 +128,8 @@ const createAircraftIcon = (
   isMobile: boolean = false,
   label: string | null = null,
   zoom: number = 9,
-  isEmergency: boolean = false
+  isEmergency: boolean = false,
+  mlatDopisek: string | null = null
 ) => {
   try {
     // Dynamic import L only on client
@@ -154,6 +155,15 @@ const createAircraftIcon = (
                       -2px 0 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, 0 2px 0 #fff;`
       : '';
     
+    // MLAT dopisek styling: 9px amber, next to the main label
+    const mlatDopisekStyle = mlatDopisek
+      ? `position: absolute; left: ${size + 4}px; top: 50%; transform: translateY(calc(-50% + ${label ? '10px' : '0px'})); 
+         font-size: 9px; font-family: system-ui, -apple-system, sans-serif; 
+         color: #d97706; font-weight: 500; white-space: nowrap; pointer-events: none;
+         text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+                      -2px 0 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, 0 2px 0 #fff;`
+      : '';
+    
     // Twemoji airplane glyph (U+2708) - faces upper-right / NE at 0°
     // Wrap in a container div with position:relative so label can be absolutely positioned
     const html = `
@@ -162,6 +172,7 @@ const createAircraftIcon = (
         <img src="/twemoji-2708.svg" width="${size}" height="${size}" 
              style="transform: rotate(${rotation}deg); transform-origin: center center; display: block;" alt="✈" />
         ${label ? `<span style="${labelStyle}">${label}</span>` : ''}
+        ${mlatDopisek ? `<span style="${mlatDopisekStyle}">${mlatDopisek}</span>` : ''}
       </div>
     `;
     
@@ -669,6 +680,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             // Check if emergency squawk
             const isEmergency = isEmergencySquawk(ac.squawk);
             
+            // Check if MLAT
+            const isMlat = ac.src?.trim().toLowerCase().startsWith('mlat') || false;
+            
             // Label logic:
             // - Always show for selected aircraft
             // - For others: only if labelsEnabled AND zoom >= 9
@@ -684,7 +698,17 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
               labelText = ac.callsign || ac.hex;
             }
             
-            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText, currentZoom, isEmergency);
+            // MLAT dopisek logic:
+            // - Always show when selected AND src is MLAT
+            // - For non-selected: only when labelsEnabled AND zoom >= 9 AND src is MLAT
+            let mlatDopisek: string | null = null;
+            if (isMlat) {
+              if (isSelected || (labelsEnabled && currentZoom >= 9)) {
+                mlatDopisek = 'MLAT';
+              }
+            }
+            
+            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText, currentZoom, isEmergency, mlatDopisek);
             return (
               <Marker
                 key={ac.hex}
