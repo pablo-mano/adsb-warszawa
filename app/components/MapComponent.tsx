@@ -304,6 +304,26 @@ function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void })
   return null;
 }
 
+// Component to follow selected aircraft
+function FollowSelectedAircraft({ selectedAircraft }: { selectedAircraft: Aircraft | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !selectedAircraft || selectedAircraft.lat == null || selectedAircraft.lon == null) {
+      return;
+    }
+
+    // Recenter map on selected aircraft, preserving current zoom
+    const currentZoom = map.getZoom();
+    map.setView([selectedAircraft.lat, selectedAircraft.lon], currentZoom, {
+      animate: true,
+      duration: 0.25,
+    });
+  }, [map, selectedAircraft]);
+
+  return null;
+}
+
 export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -430,6 +450,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           labelsEnabled={labelsEnabled} 
           onToggle={() => setLabelsEnabled(!labelsEnabled)} 
         />
+        <FollowSelectedAircraft selectedAircraft={selectedAircraft} />
         {selectedTrail.length >= 2 && (() => {
           try {
             const positions: [number, number][] = selectedTrail.map(p => [p.lat, p.lon]);
