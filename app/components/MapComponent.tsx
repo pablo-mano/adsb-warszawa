@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
+import { typeDisplayName } from '../lib/aircraftTypes';
 
 export interface Aircraft {
   hex: string;
@@ -291,6 +292,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
                 <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
                   <div className="text-xs">
                     <div className="font-bold">{ac.callsign || ac.hex}</div>
+                    {typeDisplayName(ac.typeCode) && <div>{typeDisplayName(ac.typeCode)}</div>}
                     {ac.alt !== undefined && !ac.onGround && <div>{ac.alt} ft</div>}
                   </div>
                 </Tooltip>
