@@ -4,10 +4,11 @@ export interface FlightRoute {
   destIcao?: string;
   destIata?: string;
   destName?: string;
-  destLat: number;
-  destLon: number;
+  destLat?: number;
+  destLon?: number;
   originIata?: string;
   originIcao?: string;
+  originName?: string;
 }
 
 interface CacheEntry {
@@ -79,22 +80,25 @@ async function lookupCallsign(callsign: string): Promise<FlightRoute | null> {
     const data = (await res.json()) as AdsbdbResponse;
     const dest = data.response?.flightroute?.destination;
     const origin = data.response?.flightroute?.origin;
-    if (
-      typeof dest?.latitude !== 'number' ||
-      typeof dest?.longitude !== 'number' ||
-      !Number.isFinite(dest.latitude) ||
-      !Number.isFinite(dest.longitude)
-    ) {
+    const destCoordsOk =
+      typeof dest?.latitude === 'number' &&
+      typeof dest?.longitude === 'number' &&
+      Number.isFinite(dest.latitude) &&
+      Number.isFinite(dest.longitude);
+    const originName = origin?.municipality || origin?.name;
+    const hasOrigin = Boolean(origin?.iata_code || origin?.icao_code || originName);
+    if (!destCoordsOk && !hasOrigin) {
       return null;
     }
     return {
-      destIcao: dest.icao_code,
-      destIata: dest.iata_code,
-      destName: dest.municipality || dest.name,
-      destLat: dest.latitude,
-      destLon: dest.longitude,
+      destIcao: dest?.icao_code,
+      destIata: dest?.iata_code,
+      destName: dest?.municipality || dest?.name,
+      destLat: destCoordsOk ? dest.latitude : undefined,
+      destLon: destCoordsOk ? dest.longitude : undefined,
       originIata: origin?.iata_code,
       originIcao: origin?.icao_code,
+      originName,
     };
   } catch (err) {
     console.error('Route lookup failed:', key, err);
@@ -139,6 +143,8 @@ export function attachCachedRoutes<T extends { callsign?: string; destLat?: numb
       destLat: route.destLat,
       destLon: route.destLon,
       originIata: route.originIata,
+      originIcao: route.originIcao,
+      originName: route.originName,
     };
   });
 }

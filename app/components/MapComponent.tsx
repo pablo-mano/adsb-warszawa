@@ -31,6 +31,8 @@ export interface Aircraft {
   destLat?: number;
   destLon?: number;
   originIata?: string;
+  originIcao?: string;
+  originName?: string;
 }
 
 interface TrailPoint {
@@ -768,8 +770,12 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
                     <div className="font-bold">{ac.callsign || ac.hex}</div>
                     {typeDisplayName(ac.typeCode) && <div>{typeDisplayName(ac.typeCode)}</div>}
                     {ac.alt !== undefined && !ac.onGround && <div>{ac.alt} ft</div>}
-                    {(ac.destIata || ac.destIcao) && (
-                      <div>→ {ac.destIata || ac.destIcao}{ac.destName ? ` ${ac.destName}` : ''}</div>
+                    {(ac.originIata || ac.originIcao || ac.destIata || ac.destIcao) && (
+                      <div>
+                        {ac.originIata || ac.originIcao || '?'}
+                        {' → '}
+                        {ac.destIata || ac.destIcao || '?'}
+                      </div>
                     )}
                   </div>
                 </Tooltip>

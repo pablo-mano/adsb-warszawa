@@ -44,6 +44,8 @@ interface NormalizedAircraft {
   destLat?: number;
   destLon?: number;
   originIata?: string;
+  originIcao?: string;
+  originName?: string;
 }
 
 // 250 NM is the adsb.fi / adsb.lol max circle. From EPWA that covers
