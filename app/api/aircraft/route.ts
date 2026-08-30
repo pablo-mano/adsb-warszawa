@@ -131,6 +131,14 @@ export async function GET() {
         .map(ac => normalizeAircraft(ac, nowSeconds))
         .filter((a): a is NormalizedAircraft => a !== null);
 
+      // PREVIEW-ONLY: Override one aircraft with emergency squawk 7700 for testing
+      if (process.env.VERCEL_ENV === 'preview' && normalized.length > 0) {
+        normalized[0] = {
+          ...normalized[0],
+          squawk: '7700',
+        };
+      }
+
       // Upsert positions to DB (non-blocking, no failure propagation)
       const positionsToStore: PositionRow[] = normalized
         .filter(ac => ac.hex && ac.lat != null && ac.lon != null && ac.ts != null)
