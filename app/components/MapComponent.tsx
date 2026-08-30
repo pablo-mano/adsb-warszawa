@@ -636,8 +636,10 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Data: <a href="https://adsb.fi/">adsb.fi</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {aircraft.map((ac) => {
+        {(() => {
+          const ac = selectedAircraft;
           if (
+            !ac ||
             ac.destLat == null ||
             ac.destLon == null ||
             !Number.isFinite(ac.destLat) ||
@@ -648,8 +650,6 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           const distKm = haversineKm(ac.lat, ac.lon, ac.destLat, ac.destLon);
           if (distKm < 2) return null;
           if (ac.onGround && distKm < 20) return null;
-
-          const isSelected = selectedAircraft?.hex === ac.hex;
           const destLabel = ac.destIata || ac.destIcao;
           return (
             <Polyline
@@ -657,8 +657,8 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
               positions={greatCircle(ac.lat, ac.lon, ac.destLat, ac.destLon)}
               pathOptions={{
                 color: '#000000',
-                weight: isSelected ? 2.5 : 1.75,
-                opacity: isSelected ? 1 : 0.85,
+                weight: 2.5,
+                opacity: 1,
                 dashArray: '8 6',
                 lineCap: 'round',
               }}
@@ -673,7 +673,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
               )}
             </Polyline>
           );
-        })}
+        })()}
         {selectedAircraft?.destLat != null && selectedAircraft.destLon != null && (
           <CircleMarker
             center={[selectedAircraft.destLat, selectedAircraft.destLon]}
