@@ -24,7 +24,7 @@ export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
             className="flex-shrink-0 w-11 h-11 -mt-1 -mr-1 flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-colors"
             aria-label="Close"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -36,26 +36,52 @@ export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
         <div className="space-y-3">
           <DetailRow label="Hex" value={aircraft.hex.toUpperCase()} />
           <DetailRow label="Rejestracja" value={aircraft.reg} />
-          <DetailRow label="Typ" value={typeDisplayName(aircraft.typeCode)} />
+          <DetailRow label="Typ" value={typeDisplayName(aircraft.typeCode) || aircraft.typeCode} />
           <DetailRow 
             label="Wysokość" 
             value={aircraft.onGround ? 'Na ziemi' : (aircraft.alt !== undefined ? `${aircraft.alt} ft` : undefined)} 
           />
           <DetailRow 
+            label="Wys. geom" 
+            value={aircraft.altGeom !== undefined ? `${aircraft.altGeom} ft` : undefined} 
+          />
+          <DetailRow 
             label="Prędkość" 
             value={aircraft.gs !== undefined ? `${aircraft.gs} kt` : undefined} 
           />
+          <DetailRow 
+            label="Kurs" 
+            value={aircraft.track !== undefined ? `${aircraft.track}°` : undefined} 
+          />
           <DetailRow label="Squawk" value={aircraft.squawk} />
-          <DetailRow label="Lat" value={aircraft.lat.toFixed(4)} />
-          <DetailRow label="Lon" value={aircraft.lon.toFixed(4)} />
+          <DetailRow label="Lat / Lon" value={`${aircraft.lat.toFixed(4)} / ${aircraft.lon.toFixed(4)}`} />
+          <DetailRow 
+            label="Od EPWA" 
+            value={aircraft.dstNm !== undefined ? `${aircraft.dstNm} NM` : undefined} 
+          />
           <DetailRow 
             label="Widziano" 
             value={aircraft.seen !== undefined ? `${Math.floor(aircraft.seen)}s temu` : undefined} 
+          />
+          <DetailRow 
+            label="Źródło" 
+            value={aircraft.src ? formatSource(aircraft.src) : undefined} 
           />
         </div>
       </div>
     </div>
   );
+}
+
+function formatSource(src: string): string {
+  const lower = src.toLowerCase();
+  if (lower.includes('mlat')) {
+    return 'MLAT';
+  }
+  if (lower.includes('adsb')) {
+    return 'ADS-B';
+  }
+  return src;
 }
 
 function DetailRow({ label, value }: { label: string; value?: string | number }) {
