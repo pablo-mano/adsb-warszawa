@@ -35,14 +35,16 @@ export default function FlightList({
   // Determine empty state message
   let emptyMessage = 'Brak samolotów w zasięgu';
   
-  const hasAnyFilter = hasSearchQuery || militaryEnabled || hasActiveFilters;
-  
-  if (hasAnyFilter && aircraft.length === 0) {
-    emptyMessage = 'Brak lotów dla filtrów';
-  } else if (hasSearchQuery && aircraft.length === 0) {
-    emptyMessage = `Brak lotów dla «${searchQuery}»`;
-  } else if (militaryEnabled && militaryLoaded && aircraft.length === 0 && !hasSearchQuery) {
-    emptyMessage = 'Brak wojskowych w zasięgu';
+  if (aircraft.length === 0) {
+    // Check specific filters in priority order
+    if (hasSearchQuery) {
+      emptyMessage = `Brak lotów dla «${searchQuery}»`;
+    } else if (militaryEnabled && militaryLoaded && !hasActiveFilters) {
+      emptyMessage = 'Brak wojskowych w zasięgu';
+    } else if (hasActiveFilters || militaryEnabled) {
+      // New filters (onGround/alt/gs/type) are active, or military + filters combo
+      emptyMessage = 'Brak lotów dla filtrów';
+    }
   }
 
   return (

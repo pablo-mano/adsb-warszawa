@@ -392,7 +392,7 @@ export default function Home() {
                     onClick={() => setFilterPanelOpen(false)}
                   />
                   {/* Popover */}
-                  <div className="hidden md:block absolute top-14 right-3 w-[340px] bg-white rounded-lg shadow-xl border border-zinc-200 z-50 max-h-[calc(100vh-200px)] overflow-y-auto">
+                  <div className="hidden md:block absolute top-14 right-3 w-[340px] bg-white rounded-lg shadow-xl border border-zinc-200 z-50 max-h-[calc(100vh-200px)]">
                     <FilterPanel
                       filters={filters}
                       onFiltersChange={setFilters}
@@ -407,14 +407,14 @@ export default function Home() {
 
           {/* Mobile Filter Bottom Sheet - over list only */}
           {filterPanelOpen && !selectedAircraft && (
-            <div className="md:hidden absolute inset-0 z-50 pointer-events-none">
+            <div className="md:hidden absolute inset-0 z-50 pointer-events-none flex flex-col">
               {/* Backdrop */}
               <div 
                 className="absolute inset-0 bg-black/20 pointer-events-auto"
                 onClick={() => setFilterPanelOpen(false)}
               />
-              {/* Sheet */}
-              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl shadow-xl max-h-[70vh] overflow-y-auto pointer-events-auto">
+              {/* Sheet - use flex structure to prevent clipping */}
+              <div className="mt-auto bg-white rounded-t-xl shadow-xl pointer-events-auto flex flex-col max-h-full">
                 <FilterPanel
                   filters={filters}
                   onFiltersChange={setFilters}
