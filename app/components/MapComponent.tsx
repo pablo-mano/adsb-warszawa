@@ -379,12 +379,14 @@ function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateCon
         onLocationUpdate(location);
         updateStatus('granted');
 
-        // One-shot center on the user. Zoom in if needed so the accuracy
-        // ring is actually visible (at city-wide zoom it collapses to ~2px).
-        const L = require('leaflet');
-        const visibleRadius = Math.max(location.accuracy, 40);
-        const bounds = L.latLng(location.lat, location.lon).toBounds(visibleRadius * 2);
-        map.fitBounds(bounds.pad(0.8), { maxZoom: 16, animate: true });
+        // One-shot center on the user at a 5 km range (center → nearer map edge).
+        const LOCATE_RANGE_M = 5000;
+        const size = map.getSize();
+        const minPx = Math.max(Math.min(size.x, size.y), 1);
+        const metersPerPixelAtZoom0 = 156543.03392 * Math.cos((location.lat * Math.PI) / 180);
+        const targetMpp = (LOCATE_RANGE_M * 2) / minPx;
+        const zoom = Math.log2(metersPerPixelAtZoom0 / targetMpp);
+        map.setView([location.lat, location.lon], zoom, { animate: true });
       },
       (error) => {
         console.error('Geolocation error:', error);
