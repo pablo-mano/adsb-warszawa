@@ -23,6 +23,19 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: '/atc-sw.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache',
+          },
+          {
+            key: 'Service-Worker-Allowed',
+            value: '/',
+          },
+        ],
+      },
+      {
         source: '/api/aircraft',
         headers: [
           {

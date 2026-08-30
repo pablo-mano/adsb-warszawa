@@ -1,62 +1,114 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { EPWA_ATC, EPWA_ATC_MSG_SOURCE } from '../lib/epwa';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { EPWA_ATC } from '../lib/epwa';
 
 export type AtcStatus = 'idle' | 'loading' | 'playing' | 'error';
 
+const PROXY_PATH = '/api/atc/epwa';
+
+let workerReady: Promise<void> | null = null;
+
+function ensureAtcServiceWorker(): Promise<void> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return Promise.resolve();
+  }
+  if (!workerReady) {
+    workerReady = (async () => {
+      await navigator.serviceWorker.register('/atc-sw.js');
+      await navigator.serviceWorker.ready;
+      if (navigator.serviceWorker.controller) return;
+      await new Promise<void>((resolve) => {
+        const timeout = window.setTimeout(() => resolve(), 4000);
+        navigator.serviceWorker.addEventListener(
+          'controllerchange',
+          () => {
+            window.clearTimeout(timeout);
+            resolve();
+          },
+          { once: true }
+        );
+      });
+    })().catch((err) => {
+      workerReady = null;
+      console.warn('ATC service worker unavailable', err);
+    });
+  }
+  return workerReady;
+}
+
 export function useEpwaAtc() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const wantedRef = useRef(false);
   const [status, setStatus] = useState<AtcStatus>('idle');
-  const [frameKey, setFrameKey] = useState(0);
-  const [frameOn, setFrameOn] = useState(false);
 
   const stop = useCallback(() => {
-    setFrameOn(false);
+    wantedRef.current = false;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    }
     setStatus('idle');
   }, []);
 
-  const play = useCallback(() => {
+  const play = useCallback(async () => {
+    wantedRef.current = true;
     setStatus('loading');
-    setFrameKey((k) => k + 1);
-    setFrameOn(true);
+    await ensureAtcServiceWorker();
+    const audio = audioRef.current;
+    if (!audio || !wantedRef.current) return;
+    audio.src = `${PROXY_PATH}?t=${Date.now()}`;
+    try {
+      await audio.play();
+    } catch {
+      if (wantedRef.current) setStatus('error');
+    }
   }, []);
 
   const toggle = useCallback(() => {
     if (status === 'playing' || status === 'loading') {
       stop();
     } else {
-      play();
+      void play();
     }
   }, [play, status, stop]);
 
   useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      const data = event.data;
-      if (!data || data.source !== EPWA_ATC_MSG_SOURCE) return;
-      if (data.type === 'playing') setStatus('playing');
-      if (data.type === 'error') {
-        setFrameOn(false);
-        setStatus('error');
+    const audio = new Audio();
+    audio.preload = 'none';
+    audioRef.current = audio;
+
+    const onPlaying = () => {
+      if (wantedRef.current) setStatus('playing');
+    };
+    const onWaiting = () => {
+      if (wantedRef.current && audio.src) {
+        setStatus((prev) => (prev === 'playing' ? prev : 'loading'));
       }
     };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
+    const onError = () => {
+      if (wantedRef.current) setStatus('error');
+    };
+
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('error', onError);
+    void ensureAtcServiceWorker();
+
+    return () => {
+      wantedRef.current = false;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('error', onError);
+    };
   }, []);
 
-  const frame = frameOn ? (
-    <iframe
-      key={frameKey}
-      src="/atc/epwa"
-      title="EPWA ATC"
-      allow="autoplay"
-      referrerPolicy="no-referrer"
-      className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
-      aria-hidden
-    />
-  ) : null;
-
-  return { status, play, stop, toggle, frame };
+  return { status, play, stop, toggle };
 }
 
 export default function AtcPlayer({

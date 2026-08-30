@@ -474,7 +474,6 @@ export default function Home() {
         </a>
         {' '}• niekomercyjnie
       </footer>
-      {atc.frame}
     </div>
   );
 }
