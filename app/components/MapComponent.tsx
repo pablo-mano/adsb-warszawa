@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, type MutableRefObject } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, Polyline, Circle, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
@@ -44,6 +44,7 @@ interface MapComponentProps {
   aircraft: Aircraft[];
   selectedAircraft: Aircraft | null;
   onSelectAircraft: (aircraft: Aircraft) => void;
+  onDeselectAircraft: () => void;
   selectedTrail: TrailPoint[];
   trailHistory: Map<string, TrailPoint[]>;
 }
@@ -335,6 +336,37 @@ function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void })
 }
 
 // Component to follow selected aircraft
+function MapBackgroundDeselect({
+  enabled,
+  onDeselect,
+  ignoreClickRef,
+}: {
+  enabled: boolean;
+  onDeselect: () => void;
+  ignoreClickRef: MutableRefObject<boolean>;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || !enabled) return;
+
+    const handleClick = () => {
+      if (ignoreClickRef.current) {
+        ignoreClickRef.current = false;
+        return;
+      }
+      onDeselect();
+    };
+
+    map.on('click', handleClick);
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, [map, enabled, onDeselect, ignoreClickRef]);
+
+  return null;
+}
+
 function FollowSelectedAircraft({
   selectedAircraft,
   suppressFollow,
@@ -564,7 +596,7 @@ function UserLocationLayer({ location }: { location: UserLocation }) {
   );
 }
 
-export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
+export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, onDeselectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -573,6 +605,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
   const lastKnownHeadingRef = useRef<Map<string, number>>(new Map());
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [followSuppressed, setFollowSuppressed] = useState(false);
+  const ignoreMapClickRef = useRef(false);
 
   const handleLocationUpdate = useCallback((location: UserLocation | null) => {
     setUserLocation(location);
@@ -587,6 +620,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
   }, []);
 
   const handleSelectAircraft = useCallback((ac: Aircraft) => {
+    ignoreMapClickRef.current = true;
     setFollowSuppressed(false);
     onSelectAircraft(ac);
   }, [onSelectAircraft]);
@@ -665,6 +699,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             <Polyline
               key={`dest-${ac.hex}`}
               positions={greatCircle(ac.lat, ac.lon, ac.destLat, ac.destLon)}
+              interactive={false}
               pathOptions={{
                 color: '#000000',
                 weight: 2.5,
@@ -688,6 +723,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           <CircleMarker
             center={[selectedAircraft.destLat, selectedAircraft.destLon]}
             radius={5}
+            interactive={false}
             pathOptions={{
               color: '#000000',
               fillColor: '#000000',
@@ -754,8 +790,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
                 position={[ac.lat, ac.lon]}
                 icon={icon}
                 eventHandlers={{
-                  click: () => {
+                  click: (event) => {
                     try {
+                      event.originalEvent?.stopPropagation();
                       handleSelectAircraft(ac);
                     } catch (error) {
                       console.error('Error selecting aircraft:', error);
@@ -791,6 +828,11 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
         <FollowSelectedAircraft
           selectedAircraft={selectedAircraft}
           suppressFollow={followSuppressed}
+        />
+        <MapBackgroundDeselect
+          enabled={selectedAircraft != null}
+          onDeselect={onDeselectAircraft}
+          ignoreClickRef={ignoreMapClickRef}
         />
         {selectedTrail.length >= 2 && (() => {
           try {
