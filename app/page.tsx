@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import FlightList from './components/FlightList';
 import FlightDetail from './components/FlightDetail';
+import AirportDetail from './components/AirportDetail';
 import FilterPanel, { FilterState } from './components/FilterPanel';
+import { useEpwaAtc } from './components/AtcPlayer';
 import { Aircraft } from './components/MapComponent';
 import { getAltitudeLegendGradient } from './lib/colorByAlt';
 
@@ -40,6 +42,8 @@ export default function Home() {
     typeCode: ''
   });
   const [filterPanelOpen, setFilterPanelOpen] = useState<boolean>(false);
+  const [selectedAirport, setSelectedAirport] = useState<boolean>(false);
+  const atc = useEpwaAtc();
   const trailHistoryRef = useRef<Map<string, TrailPoint[]>>(new Map());
   const selectedHexRef = useRef<string | null>(null);
 
@@ -165,14 +169,24 @@ export default function Home() {
   }, [selectedAircraft]);
 
   const handleSelectAircraft = (aircraft: Aircraft) => {
+    setSelectedAirport(false);
     setSelectedAircraft(aircraft);
     selectedHexRef.current = aircraft.hex;
+  };
+
+  const handleSelectAirport = () => {
+    setSelectedAircraft(null);
+    setSelectedTrail([]);
+    selectedHexRef.current = null;
+    setSelectedAirport(true);
+    setFilterPanelOpen(false);
   };
 
   const handleCloseDetail = () => {
     setSelectedAircraft(null);
     setSelectedTrail([]);
     selectedHexRef.current = null;
+    setSelectedAirport(false);
   };
 
   // Filter aircraft based on search, military, and filters
@@ -278,6 +292,17 @@ export default function Home() {
             ADS-B Warszawa
           </h1>
           <div className="flex items-center gap-2">
+            {(atc.status === 'playing' || atc.status === 'loading') && (
+              <button
+                type="button"
+                onClick={handleSelectAirport}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100"
+                title="ATC EPWA Tower"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                ATC
+              </button>
+            )}
             <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
             <span className="text-sm md:text-base font-medium text-gray-900">
               {filteredAircraft.length}
@@ -306,11 +331,14 @@ export default function Home() {
             onSelectAircraft={handleSelectAircraft}
             selectedTrail={selectedTrail}
             trailHistory={trailHistoryRef.current}
+            airportSelected={selectedAirport}
+            onSelectAirport={handleSelectAirport}
+            atcLive={atc.status === 'playing'}
           />
         </div>
 
         {/* Mobile Filter Toolbar - between map and list, hidden when aircraft selected */}
-        {!selectedAircraft && (
+        {!selectedAircraft && !selectedAirport && (
           <div className="md:hidden flex-shrink-0 bg-white border-t border-zinc-200">
             <div className="p-3">
               <div className="flex items-center gap-2">
@@ -366,6 +394,12 @@ export default function Home() {
               aircraft={selectedAircraft}
               onClose={handleCloseDetail}
             />
+          ) : selectedAirport ? (
+            <AirportDetail
+              status={atc.status}
+              onToggleAtc={atc.toggle}
+              onClose={handleCloseDetail}
+            />
           ) : (
             <>
               <FlightList
@@ -406,7 +440,7 @@ export default function Home() {
           )}
 
           {/* Mobile Filter Bottom Sheet - over list only */}
-          {filterPanelOpen && !selectedAircraft && (
+          {filterPanelOpen && !selectedAircraft && !selectedAirport && (
             <div className="md:hidden absolute inset-0 z-50 flex flex-col">
               <div
                 className="absolute inset-0 bg-black/20"

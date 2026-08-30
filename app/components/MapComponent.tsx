@@ -7,6 +7,7 @@ import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
 import { typeDisplayName } from '../lib/aircraftTypes';
 import { greatCircle, haversineKm } from '../lib/geo';
 import { isEmergencySquawk } from '../lib/emergencySquawk';
+import { EPWA, EPWA_ATC, isEpwaAirport } from '../lib/epwa';
 
 export interface Aircraft {
   hex: string;
@@ -48,6 +49,9 @@ interface MapComponentProps {
   onSelectAircraft: (aircraft: Aircraft) => void;
   selectedTrail: TrailPoint[];
   trailHistory: Map<string, TrailPoint[]>;
+  airportSelected: boolean;
+  onSelectAirport: () => void;
+  atcLive: boolean;
 }
 
 interface LabelControlProps {
@@ -186,6 +190,49 @@ const createAircraftIcon = (
     return undefined;
   }
 };
+
+const createAirportIcon = (
+  isSelected: boolean = false,
+  isMobile: boolean = false,
+  isLive: boolean = false
+) => {
+  try {
+    const L = require('leaflet');
+    const hit = isMobile ? 44 : 32;
+    const dot = isSelected ? (isMobile ? 12 : 10) : (isMobile ? 10 : 8);
+    const labelFontSize = isMobile ? '10px' : '11px';
+    const labelText = isLive ? 'EPWA ATC' : 'EPWA';
+    const labelW = isMobile ? 58 : 52;
+    const width = Math.ceil(hit / 2 + 8 + labelW);
+    const ringColor = isLive ? '#ef4444' : isSelected ? '#2563eb' : 'transparent';
+    const ring = ringColor !== 'transparent'
+      ? `box-shadow: 0 0 0 3px ${ringColor};`
+      : 'box-shadow: 0 1px 2px rgba(0,0,0,0.35);';
+
+    const html = `
+      <div style="position: relative; width: ${width}px; height: ${hit}px;">
+        <div style="position: absolute; left: ${hit / 2 - dot / 2}px; top: 50%; width: ${dot}px; height: ${dot}px;
+             margin-top: ${-dot / 2}px; background: #18181b;
+             border: 2px solid #fff; border-radius: 50%; ${ring}"></div>
+        <span style="position: absolute; left: ${hit / 2 + dot / 2 + 6}px; top: 50%; transform: translateY(-50%);
+             font-size: ${labelFontSize}; font-family: system-ui, -apple-system, sans-serif;
+             color: #18181b; font-weight: 600; white-space: nowrap;
+             text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+                          -2px 0 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, 0 2px 0 #fff;">${labelText}</span>
+      </div>
+    `;
+
+    return L.divIcon({
+      html,
+      className: 'airport-marker',
+      iconSize: [width, hit],
+      iconAnchor: [hit / 2, hit / 2],
+    });
+  } catch (error) {
+    console.error('Error creating airport icon:', error);
+    return undefined;
+  }
+};;
 
 // Desktop altitude legend component
 function AltitudeLegend() {
@@ -566,7 +613,56 @@ function UserLocationLayer({ location }: { location: UserLocation }) {
   );
 }
 
-export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
+function EpwaAirportMarker({
+  selected,
+  isMobile,
+  atcLive,
+  onSelect,
+}: {
+  selected: boolean;
+  isMobile: boolean;
+  atcLive: boolean;
+  onSelect: () => void;
+}) {
+  const map = useMap();
+  if (!map.getPane('airportPane')) {
+    const pane = map.createPane('airportPane');
+    // markerPane is 600; keep airport above aircraft, below tooltips/popups (650/700)
+    pane.style.zIndex = '625';
+  }
+
+  return (
+    <Marker
+      position={[EPWA.lat, EPWA.lon]}
+      icon={createAirportIcon(selected, isMobile, atcLive)}
+      pane="airportPane"
+      zIndexOffset={2000}
+      eventHandlers={{
+        click: () => {
+          onSelect();
+        },
+      }}
+    >
+      <Tooltip direction="top" offset={[0, -12]} opacity={0.9}>
+        <div className="text-xs">
+          <div className="font-bold">{EPWA.icao} · {EPWA.name}</div>
+          <div>ATC {EPWA_ATC.feedName} · kliknij, aby słuchać</div>
+        </div>
+      </Tooltip>
+    </Marker>
+  );
+}
+
+export default function MapComponent({
+  aircraft,
+  selectedAircraft,
+  onSelectAircraft,
+  selectedTrail,
+  trailHistory,
+  airportSelected,
+  onSelectAirport,
+  atcLive,
+}: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -633,7 +729,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
   try {
     return (
       <MapContainer
-        center={[52.1657, 20.9671]}
+        center={[EPWA.lat, EPWA.lon]}
         zoom={6}
         minZoom={5}
         maxZoom={18}
@@ -686,7 +782,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             </Polyline>
           );
         })()}
-        {selectedAircraft?.destLat != null && selectedAircraft.destLon != null && (
+        {selectedAircraft?.destLat != null &&
+          selectedAircraft.destLon != null &&
+          !isEpwaAirport(selectedAircraft.destIcao, selectedAircraft.destIata) && (
           <CircleMarker
             center={[selectedAircraft.destLat, selectedAircraft.destLon]}
             radius={5}
@@ -704,6 +802,12 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             </Tooltip>
           </CircleMarker>
         )}
+        <EpwaAirportMarker
+          selected={airportSelected}
+          isMobile={isMobile}
+          atcLive={atcLive}
+          onSelect={onSelectAirport}
+        />
         <LocateControl
           onLocationUpdate={handleLocationUpdate}
           onStatusChange={handleStatusChange}
