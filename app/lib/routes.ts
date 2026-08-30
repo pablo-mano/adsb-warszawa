@@ -74,7 +74,7 @@ async function lookupCallsign(callsign: string): Promise<FlightRoute | null> {
   try {
     const res = await fetch(`https://api.adsbdb.com/v0/callsign/${encodeURIComponent(key)}`, {
       headers: { 'User-Agent': USER_AGENT },
-      next: { revalidate: 3600 },
+      cache: 'no-store',
     });
     if (!res.ok) return null;
     const data = (await res.json()) as AdsbdbResponse;
