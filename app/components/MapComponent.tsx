@@ -656,10 +656,10 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
               key={`dest-${ac.hex}`}
               positions={greatCircle(ac.lat, ac.lon, ac.destLat, ac.destLon)}
               pathOptions={{
-                color: '#111111',
-                weight: isSelected ? 2 : 1.25,
-                opacity: isSelected ? 0.9 : 0.55,
-                dashArray: '7 6',
+                color: '#000000',
+                weight: isSelected ? 2.5 : 1.75,
+                opacity: isSelected ? 1 : 0.85,
+                dashArray: '8 6',
                 lineCap: 'round',
               }}
             >
@@ -679,9 +679,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             center={[selectedAircraft.destLat, selectedAircraft.destLon]}
             radius={5}
             pathOptions={{
-              color: '#111111',
-              fillColor: '#111111',
-              fillOpacity: 0.85,
+              color: '#000000',
+              fillColor: '#000000',
+              fillOpacity: 1,
               weight: 1,
             }}
           >
