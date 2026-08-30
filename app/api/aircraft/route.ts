@@ -39,9 +39,11 @@ interface NormalizedAircraft {
   dstNm?: number;
 }
 
+// 250 NM is the adsb.fi / adsb.lol max circle. From EPWA that covers
+// all of Poland plus neighboring CEE (LT, western BY/UA, SK, edges of DE/CZ/AT/HU).
 const ENDPOINTS = [
-  'https://opendata.adsb.fi/api/v3/lat/52.1657/lon/20.9671/dist/80',
-  'https://api.adsb.lol/v2/lat/52.1657/lon/20.9671/dist/80'
+  'https://opendata.adsb.fi/api/v3/lat/52.1657/lon/20.9671/dist/250',
+  'https://api.adsb.lol/v2/lat/52.1657/lon/20.9671/dist/250'
 ];
 
 const USER_AGENT = 'adsb-warsaw-mvp/0.1 (personal; +https://datamano.com)';
