@@ -111,7 +111,7 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
     
     // SVG airplane pointing UP (north) at 0° rotation
     const svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(${rotation}deg);">
-      <path fill="${color}" d="M12 2 L11 10 L8 11 L8 13 L11 13.5 L11 20 L10 21 L12 20.5 L14 21 L13 20 L13 13.5 L16 13 L16 11 L13 10 Z"/>
+      <path fill="${color}" d="M12 1.2 L13 4.5 L13.1 9.5 L22 12.2 L22 13.8 L13.1 12.6 L13 18.5 L16.8 20.4 L16.8 21.6 L12.4 20.2 L12 22.5 L11.6 20.2 L7.2 21.6 L7.2 20.4 L11 18.5 L10.9 12.6 L2 13.8 L2 12.2 L10.9 9.5 L11 4.5 Z"/>
     </svg>`;
     
     return L.divIcon({
