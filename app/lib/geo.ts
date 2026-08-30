@@ -45,3 +45,19 @@ export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: numb
   const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(a));
 }
+
+/** Initial great-circle bearing from (lat1,lon1) to (lat2,lon2), degrees [0, 360). */
+export function initialBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+/** Smallest absolute heading difference, degrees [0, 180]. */
+export function headingDeltaDeg(a: number, b: number): number {
+  const d = Math.abs(((a - b) % 360 + 360) % 360);
+  return d > 180 ? 360 - d : d;
+}
