@@ -304,6 +304,7 @@ export default function Home() {
             aircraft={filteredAircraft}
             selectedAircraft={selectedAircraft}
             onSelectAircraft={handleSelectAircraft}
+            onDeselectAircraft={handleCloseDetail}
             selectedTrail={selectedTrail}
             trailHistory={trailHistoryRef.current}
           />
