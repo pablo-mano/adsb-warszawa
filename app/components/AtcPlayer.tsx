@@ -8,9 +8,8 @@ export type AtcStatus = 'idle' | 'loading' | 'playing' | 'error';
 function attachNoReferrer(audio: HTMLAudioElement) {
   // LiveATC Icecast returns 403 when Referer is the Vercel production origin.
   // Media requests must omit Referer; CORS mode is unnecessary for playback.
-    audio.referrerPolicy = 'no-referrer';
-    audio.setAttribute('referrerpolicy', 'no-referrer');
-    audio.removeAttribute('crossorigin');
+  audio.setAttribute('referrerpolicy', 'no-referrer');
+  audio.removeAttribute('crossorigin');
 }
 
 export function useEpwaAtc() {
