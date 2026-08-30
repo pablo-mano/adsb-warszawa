@@ -102,22 +102,37 @@ function calculateAircraftHeading(points: TrailPoint[]): number | null {
 }
 
 // Guard Leaflet usage for SSR/first load
+function aircraftIconSize(isMobile: boolean, isSelected: boolean, zoom: number): number {
+  // Shrink markers when zoomed out so they don't cover whole regions
+  let base: number;
+  if (zoom <= 6) {
+    base = isMobile ? 12 : 14;
+  } else if (zoom <= 7) {
+    base = isMobile ? 16 : 18;
+  } else if (zoom <= 8) {
+    base = isMobile ? 20 : 24;
+  } else {
+    // Mobile <768: 24px default; desktop: 32px
+    base = isMobile ? 24 : 32;
+  }
+  if (isSelected) {
+    base += 8;
+  }
+  return base;
+}
+
 const createAircraftIcon = (
   rotation: number = 0, 
   isSelected: boolean = false, 
   isMobile: boolean = false,
-  label: string | null = null
+  label: string | null = null,
+  zoom: number = 9
 ) => {
   try {
     // Dynamic import L only on client
     const L = require('leaflet');
     
-    // Responsive icon sizes
-    // Mobile <768: 24px default, 32px selected
-    // Desktop ≥768: 32px default, 40px selected
-    const size = isMobile 
-      ? (isSelected ? 32 : 24) 
-      : (isSelected ? 40 : 32);
+    const size = aircraftIconSize(isMobile, isSelected, zoom);
     const anchor = size / 2; // Center anchor
     
     // Label styling
@@ -537,7 +552,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [labelsEnabled, setLabelsEnabled] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(9);
+  const [currentZoom, setCurrentZoom] = useState(6);
   const lastKnownHeadingRef = useRef<Map<string, number>>(new Map());
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [followSuppressed, setFollowSuppressed] = useState(false);
@@ -600,7 +615,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
     return (
       <MapContainer
         center={[52.1657, 20.9671]}
-        zoom={9}
+        zoom={6}
+        minZoom={5}
+        maxZoom={18}
         style={{ 
           height: isMobile ? '55vh' : '100%',
           minHeight: isMobile ? '320px' : '100%',
@@ -645,7 +662,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             const shouldShowLabel = isSelected || (labelsEnabled && currentZoom >= 9);
             const labelText = shouldShowLabel ? (ac.callsign || ac.hex) : null;
             
-            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText);
+            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText, currentZoom);
             return (
               <Marker
                 key={ac.hex}
