@@ -40,6 +40,12 @@ interface MapComponentProps {
   trailHistory: Map<string, TrailPoint[]>;
 }
 
+interface LabelControlProps {
+  isMobile: boolean;
+  labelsEnabled: boolean;
+  onToggle: () => void;
+}
+
 // Compute heading from two lat/lon points (returns degrees, 0° = north)
 function computeHeading(lat1: number, lon1: number, lat2: number, lon2: number): number | null {
   // Skip if points are identical (zero distance)
@@ -96,7 +102,12 @@ function calculateAircraftHeading(points: TrailPoint[]): number | null {
 }
 
 // Guard Leaflet usage for SSR/first load
-const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, isMobile: boolean = false) => {
+const createAircraftIcon = (
+  rotation: number = 0, 
+  isSelected: boolean = false, 
+  isMobile: boolean = false,
+  label: string | null = null
+) => {
   try {
     // Dynamic import L only on client
     const L = require('leaflet');
@@ -109,8 +120,25 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
       : (isSelected ? 40 : 32);
     const anchor = size / 2; // Center anchor
     
+    // Label styling
+    const labelFontSize = isMobile ? '10px' : '11px';
+    const labelStyle = label 
+      ? `position: absolute; left: ${size + 4}px; top: 50%; transform: translateY(-50%); 
+         font-size: ${labelFontSize}; font-family: system-ui, -apple-system, sans-serif; 
+         color: #18181b; font-weight: 500; white-space: nowrap; pointer-events: none;
+         text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+                      -2px 0 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, 0 2px 0 #fff;`
+      : '';
+    
     // Twemoji airplane glyph (U+2708) - faces upper-right / NE at 0°
-    const html = `<img src="/twemoji-2708.svg" width="${size}" height="${size}" style="transform: rotate(${rotation}deg); transform-origin: center center;" alt="✈" />`;
+    // Wrap in a container div with position:relative so label can be absolutely positioned
+    const html = `
+      <div style="position: relative; width: ${size}px; height: ${size}px;">
+        <img src="/twemoji-2708.svg" width="${size}" height="${size}" 
+             style="transform: rotate(${rotation}deg); transform-origin: center center; display: block;" alt="✈" />
+        ${label ? `<span style="${labelStyle}">${label}</span>` : ''}
+      </div>
+    `;
     
     return L.divIcon({
       html: html,
@@ -178,10 +206,110 @@ function AltitudeLegend() {
   return null;
 }
 
+// Label toggle control component
+function LabelControl({ isMobile, labelsEnabled, onToggle }: LabelControlProps) {
+  const map = useMap();
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!map || typeof window === 'undefined') return;
+
+    try {
+      const L = require('leaflet');
+      
+      const LabelToggleControl = L.Control.extend({
+        onAdd: function() {
+          const button = L.DomUtil.create('button', 'label-toggle-control');
+          buttonRef.current = button;
+          
+          // Styling for 44px hit area
+          button.style.background = 'white';
+          button.style.border = '2px solid rgba(0,0,0,0.2)';
+          button.style.borderRadius = '4px';
+          button.style.width = '44px';
+          button.style.height = '44px';
+          button.style.display = 'flex';
+          button.style.alignItems = 'center';
+          button.style.justifyContent = 'center';
+          button.style.cursor = 'pointer';
+          button.style.fontSize = '18px';
+          button.style.fontWeight = '600';
+          button.style.transition = 'background-color 0.15s';
+          button.title = 'Etykiety';
+          button.innerHTML = '🏷️';
+          
+          // Prevent map interactions when clicking the button
+          L.DomEvent.disableClickPropagation(button);
+          L.DomEvent.disableScrollPropagation(button);
+          
+          button.onclick = (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggle();
+          };
+          
+          return button;
+        }
+      });
+
+      const labelControl = new LabelToggleControl({ position: 'topright' });
+      labelControl.addTo(map);
+
+      return () => {
+        labelControl.remove();
+      };
+    } catch (error) {
+      console.error('Error creating label control:', error);
+    }
+  }, [map, onToggle, isMobile]);
+
+  // Update button appearance when labelsEnabled changes
+  useEffect(() => {
+    if (buttonRef.current) {
+      if (labelsEnabled) {
+        buttonRef.current.style.backgroundColor = '#2563eb';
+        buttonRef.current.style.color = 'white';
+        buttonRef.current.style.borderColor = '#2563eb';
+      } else {
+        buttonRef.current.style.backgroundColor = 'white';
+        buttonRef.current.style.color = '#3f3f46';
+        buttonRef.current.style.borderColor = 'rgba(0,0,0,0.2)';
+      }
+    }
+  }, [labelsEnabled]);
+
+  return null;
+}
+
+// Component to track zoom level
+function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const handleZoom = () => {
+      onZoomChange(map.getZoom());
+    };
+
+    // Set initial zoom
+    handleZoom();
+
+    map.on('zoomend', handleZoom);
+    return () => {
+      map.off('zoomend', handleZoom);
+    };
+  }, [map, onZoomChange]);
+
+  return null;
+}
+
 export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [labelsEnabled, setLabelsEnabled] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(9);
   const lastKnownHeadingRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -258,7 +386,14 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             
             // Apply rotation: Twemoji glyph faces upper-right / NE at 0°, so subtract 45°
             const rotation = heading - 45;
-            const icon = createAircraftIcon(rotation, isSelected, isMobile);
+            
+            // Label logic:
+            // - Always show for selected aircraft
+            // - For others: only if labelsEnabled AND zoom >= 9
+            const shouldShowLabel = isSelected || (labelsEnabled && currentZoom >= 9);
+            const labelText = shouldShowLabel ? (ac.callsign || ac.hex) : null;
+            
+            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText);
             return (
               <Marker
                 key={ac.hex}
@@ -289,6 +424,12 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           }
         })}
         {selectedAircraft && selectedTrail.length >= 2 && !isMobile && <AltitudeLegend />}
+        <ZoomTracker onZoomChange={setCurrentZoom} />
+        <LabelControl 
+          isMobile={isMobile} 
+          labelsEnabled={labelsEnabled} 
+          onToggle={() => setLabelsEnabled(!labelsEnabled)} 
+        />
         {selectedTrail.length >= 2 && (() => {
           try {
             const positions: [number, number][] = selectedTrail.map(p => [p.lat, p.lon]);
