@@ -15,13 +15,15 @@ export const EPWA_ATC = {
   listenPageUrl: 'https://www.liveatc.net/search/?icao=epwa',
   // LiveATC .pls (epwa_twr2) resolves to these Icecast mounts.
   // www/d.liveatc.net is Cloudflare-protected. Stream hosts 403 when the
-  // browser sends Referer: https://adsb-warszawa.vercel.app/ — play with
-  // referrerPolicy=no-referrer (see AtcPlayer).
+  // browser sends Referer: https://adsb-warszawa.vercel.app/ — play inside
+  // /atc/epwa (Referrer-Policy: no-referrer) so the Icecast request has no Referer.
   streamUrls: [
     'https://s1-fmt2.liveatc.net/epwa_twr2',
     'https://s1-bos.liveatc.net/epwa_twr2',
   ],
 } as const;
+
+export const EPWA_ATC_MSG_SOURCE = 'epwa-atc';
 
 export function isEpwaAirport(icao?: string, iata?: string): boolean {
   return icao?.toUpperCase() === EPWA.icao || iata?.toUpperCase() === EPWA.iata;

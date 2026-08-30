@@ -1,61 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { EPWA_ATC } from '../lib/epwa';
+import { useCallback, useEffect, useState } from 'react';
+import { EPWA_ATC, EPWA_ATC_MSG_SOURCE } from '../lib/epwa';
 
 export type AtcStatus = 'idle' | 'loading' | 'playing' | 'error';
 
-function attachNoReferrer(audio: HTMLAudioElement) {
-  // LiveATC Icecast returns 403 when Referer is the Vercel production origin.
-  // Media requests must omit Referer; CORS mode is unnecessary for playback.
-  audio.setAttribute('referrerpolicy', 'no-referrer');
-  audio.removeAttribute('crossorigin');
-}
-
 export function useEpwaAtc() {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const indexRef = useRef(0);
-  const wantedRef = useRef(false);
-  const failoverLockRef = useRef(false);
   const [status, setStatus] = useState<AtcStatus>('idle');
+  const [frameKey, setFrameKey] = useState(0);
+  const [frameOn, setFrameOn] = useState(false);
 
   const stop = useCallback(() => {
-    wantedRef.current = false;
-    failoverLockRef.current = false;
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-    }
+    setFrameOn(false);
     setStatus('idle');
   }, []);
 
-  const playFrom = useCallback((index: number) => {
-    const audio = audioRef.current;
-    if (!audio || !wantedRef.current) return;
-    if (index >= EPWA_ATC.streamUrls.length) {
-      setStatus('error');
-      return;
-    }
-    failoverLockRef.current = false;
-    indexRef.current = index;
-    setStatus('loading');
-    attachNoReferrer(audio);
-    audio.src = EPWA_ATC.streamUrls[index];
-    void audio.play().catch(() => {
-      if (!wantedRef.current) return;
-      if (failoverLockRef.current) return;
-      if (indexRef.current !== index) return;
-      failoverLockRef.current = true;
-      playFrom(index + 1);
-    });
-  }, []);
-
   const play = useCallback(() => {
-    wantedRef.current = true;
-    playFrom(0);
-  }, [playFrom]);
+    setStatus('loading');
+    setFrameKey((k) => k + 1);
+    setFrameOn(true);
+  }, []);
 
   const toggle = useCallback(() => {
     if (status === 'playing' || status === 'loading') {
@@ -66,45 +30,33 @@ export function useEpwaAtc() {
   }, [play, status, stop]);
 
   useEffect(() => {
-    const audio = new Audio();
-    audio.preload = 'none';
-    audio.hidden = true;
-    attachNoReferrer(audio);
-    audio.setAttribute('playsinline', '');
-    document.body.appendChild(audio);
-    audioRef.current = audio;
-
-    const onPlaying = () => {
-      if (wantedRef.current) setStatus('playing');
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (!data || data.source !== EPWA_ATC_MSG_SOURCE) return;
+      if (data.type === 'playing') setStatus('playing');
+      if (data.type === 'error') {
+        setFrameOn(false);
+        setStatus('error');
+      }
     };
-    const onWaiting = () => {
-      if (!wantedRef.current || !audio.src) return;
-      setStatus((prev) => (prev === 'playing' ? prev : 'loading'));
-    };
-    const onError = () => {
-      if (!wantedRef.current) return;
-      if (failoverLockRef.current) return;
-      failoverLockRef.current = true;
-      playFrom(indexRef.current + 1);
-    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
 
-    audio.addEventListener('playing', onPlaying);
-    audio.addEventListener('waiting', onWaiting);
-    audio.addEventListener('error', onError);
+  const frame = frameOn ? (
+    <iframe
+      key={frameKey}
+      src="/atc/epwa"
+      title="EPWA ATC"
+      allow="autoplay"
+      referrerPolicy="no-referrer"
+      className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+      aria-hidden
+    />
+  ) : null;
 
-    return () => {
-      wantedRef.current = false;
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      audio.removeEventListener('playing', onPlaying);
-      audio.removeEventListener('waiting', onWaiting);
-      audio.removeEventListener('error', onError);
-      audio.remove();
-    };
-  }, [playFrom]);
-
-  return { status, play, stop, toggle };
+  return { status, play, stop, toggle, frame };
 }
 
 export default function AtcPlayer({
