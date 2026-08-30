@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import FlightList from './components/FlightList';
 import FlightDetail from './components/FlightDetail';
+import FilterPanel, { FilterState } from './components/FilterPanel';
 import { Aircraft } from './components/MapComponent';
 import { getAltitudeLegendGradient } from './lib/colorByAlt';
 
@@ -32,6 +33,13 @@ export default function Home() {
   const [militaryEnabled, setMilitaryEnabled] = useState<boolean>(false);
   const [militaryHexes, setMilitaryHexes] = useState<Set<string>>(new Set());
   const [militaryLoaded, setMilitaryLoaded] = useState<boolean>(false);
+  const [filters, setFilters] = useState<FilterState>({
+    onGround: false,
+    altBand: 'all',
+    gsBand: 'all',
+    typeCode: ''
+  });
+  const [filterPanelOpen, setFilterPanelOpen] = useState<boolean>(false);
   const trailHistoryRef = useRef<Map<string, TrailPoint[]>>(new Map());
   const selectedHexRef = useRef<string | null>(null);
 
@@ -167,7 +175,7 @@ export default function Home() {
     selectedHexRef.current = null;
   };
 
-  // Filter aircraft based on search and military
+  // Filter aircraft based on search, military, and filters
   const filteredAircraft = aircraft.filter((ac) => {
     // Apply search filter
     if (searchQuery.trim()) {
@@ -190,8 +198,75 @@ export default function Home() {
       }
     }
 
+    // Apply onGround filter
+    if (filters.onGround) {
+      if (!ac.onGround) {
+        return false;
+      }
+    }
+
+    // Apply altitude band filter (only if not onGround)
+    if (!filters.onGround && filters.altBand !== 'all') {
+      if (ac.onGround) {
+        // Ground aircraft don't match numeric altitude bands
+        return false;
+      }
+      if (ac.alt == null) {
+        // Missing altitude doesn't match numeric bands
+        return false;
+      }
+      if (filters.altBand === 'low' && ac.alt >= 10000) {
+        return false;
+      }
+      if (filters.altBand === 'mid' && (ac.alt < 10000 || ac.alt > 30000)) {
+        return false;
+      }
+      if (filters.altBand === 'high' && ac.alt <= 30000) {
+        return false;
+      }
+    }
+
+    // Apply ground speed band filter
+    if (filters.gsBand !== 'all') {
+      if (ac.gs == null) {
+        // Missing gs doesn't match numeric bands
+        return false;
+      }
+      if (filters.gsBand === 'slow' && ac.gs >= 250) {
+        return false;
+      }
+      if (filters.gsBand === 'mid' && (ac.gs < 250 || ac.gs > 450)) {
+        return false;
+      }
+      if (filters.gsBand === 'fast' && ac.gs <= 450) {
+        return false;
+      }
+    }
+
+    // Apply type code filter
+    if (filters.typeCode && ac.typeCode !== filters.typeCode) {
+      return false;
+    }
+
     return true;
   });
+
+  // Check if selected aircraft is in filtered set
+  useEffect(() => {
+    if (selectedAircraft && !filteredAircraft.find(ac => ac.hex === selectedAircraft.hex)) {
+      // Selected aircraft fell out of filtered set, clear selection
+      setSelectedAircraft(null);
+      setSelectedTrail([]);
+      selectedHexRef.current = null;
+    }
+  }, [filteredAircraft, selectedAircraft]);
+
+  // Check if any filters are active
+  const hasActiveFilters = 
+    filters.onGround ||
+    filters.altBand !== 'all' ||
+    filters.gsBand !== 'all' ||
+    filters.typeCode !== '';
 
 
   return (
@@ -256,6 +331,18 @@ export default function Home() {
                 >
                   Wojskowe
                 </button>
+                <button
+                  onClick={() => setFilterPanelOpen(!filterPanelOpen)}
+                  className="relative flex-shrink-0 w-11 h-11 flex items-center justify-center text-zinc-700 hover:bg-zinc-100 rounded-md transition-colors"
+                  title="Filtry"
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 4h16M5 10h10M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  {hasActiveFilters && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full"></span>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -273,25 +360,69 @@ export default function Home() {
         )}
 
         {/* List or Detail - quiet card/column, 340px on desktop */}
-        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-zinc-200 min-h-0 overflow-hidden">
+        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-zinc-200 min-h-0 overflow-hidden relative">
           {selectedAircraft ? (
             <FlightDetail
               aircraft={selectedAircraft}
               onClose={handleCloseDetail}
             />
           ) : (
-            <FlightList
-              aircraft={filteredAircraft}
-              selectedAircraft={selectedAircraft}
-              onSelectAircraft={handleSelectAircraft}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              militaryEnabled={militaryEnabled}
-              onMilitaryToggle={() => setMilitaryEnabled(!militaryEnabled)}
-              militaryLoaded={militaryLoaded}
-              hasSearchQuery={searchQuery.trim().length > 0}
-              showToolbar={true}
-            />
+            <>
+              <FlightList
+                aircraft={filteredAircraft}
+                selectedAircraft={selectedAircraft}
+                onSelectAircraft={handleSelectAircraft}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                militaryEnabled={militaryEnabled}
+                onMilitaryToggle={() => setMilitaryEnabled(!militaryEnabled)}
+                militaryLoaded={militaryLoaded}
+                hasSearchQuery={searchQuery.trim().length > 0}
+                hasActiveFilters={hasActiveFilters}
+                showToolbar={true}
+                onFilterClick={() => setFilterPanelOpen(!filterPanelOpen)}
+              />
+
+              {/* Desktop Filter Popover */}
+              {filterPanelOpen && (
+                <>
+                  {/* Backdrop */}
+                  <div 
+                    className="hidden md:block absolute inset-0 z-40"
+                    onClick={() => setFilterPanelOpen(false)}
+                  />
+                  {/* Popover */}
+                  <div className="hidden md:block absolute top-14 right-3 w-[340px] bg-white rounded-lg shadow-xl border border-zinc-200 z-50 max-h-[calc(100vh-200px)] overflow-y-auto">
+                    <FilterPanel
+                      filters={filters}
+                      onFiltersChange={setFilters}
+                      aircraft={aircraft}
+                      onClose={() => setFilterPanelOpen(false)}
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Mobile Filter Bottom Sheet - over list only */}
+          {filterPanelOpen && !selectedAircraft && (
+            <div className="md:hidden absolute inset-0 z-50 pointer-events-none">
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-black/20 pointer-events-auto"
+                onClick={() => setFilterPanelOpen(false)}
+              />
+              {/* Sheet */}
+              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl shadow-xl max-h-[70vh] overflow-y-auto pointer-events-auto">
+                <FilterPanel
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  aircraft={aircraft}
+                  onClose={() => setFilterPanelOpen(false)}
+                />
+              </div>
+            </div>
           )}
         </div>
       </div>

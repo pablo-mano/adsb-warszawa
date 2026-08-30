@@ -13,7 +13,9 @@ interface FlightListProps {
   onMilitaryToggle: () => void;
   militaryLoaded: boolean;
   hasSearchQuery: boolean;
+  hasActiveFilters: boolean;
   showToolbar?: boolean;
+  onFilterClick: () => void;
 }
 
 export default function FlightList({ 
@@ -26,12 +28,18 @@ export default function FlightList({
   onMilitaryToggle,
   militaryLoaded,
   hasSearchQuery,
-  showToolbar = true
+  hasActiveFilters,
+  showToolbar = true,
+  onFilterClick
 }: FlightListProps) {
   // Determine empty state message
   let emptyMessage = 'Brak samolotów w zasięgu';
   
-  if (hasSearchQuery && aircraft.length === 0) {
+  const hasAnyFilter = hasSearchQuery || militaryEnabled || hasActiveFilters;
+  
+  if (hasAnyFilter && aircraft.length === 0) {
+    emptyMessage = 'Brak lotów dla filtrów';
+  } else if (hasSearchQuery && aircraft.length === 0) {
     emptyMessage = `Brak lotów dla «${searchQuery}»`;
   } else if (militaryEnabled && militaryLoaded && aircraft.length === 0 && !hasSearchQuery) {
     emptyMessage = 'Brak wojskowych w zasięgu';
@@ -62,6 +70,20 @@ export default function FlightList({
               }`}
             >
               Wojskowe
+            </button>
+
+            {/* Filtry Button */}
+            <button
+              onClick={onFilterClick}
+              className="relative flex-shrink-0 w-11 h-11 flex items-center justify-center text-zinc-700 hover:bg-zinc-100 rounded-md transition-colors"
+              title="Filtry"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 4h16M5 10h10M8 16h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              {hasActiveFilters && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full"></span>
+              )}
             </button>
           </div>
         </div>
