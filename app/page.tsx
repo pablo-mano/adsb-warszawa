@@ -33,6 +33,7 @@ export default function Home() {
   const [militaryHexes, setMilitaryHexes] = useState<Set<string>>(new Set());
   const [militaryLoaded, setMilitaryLoaded] = useState<boolean>(false);
   const trailHistoryRef = useRef<Map<string, TrailPoint[]>>(new Map());
+  const selectedHexRef = useRef<string | null>(null);
 
   useEffect(() => {
     const fetchAircraft = async () => {
@@ -46,15 +47,17 @@ export default function Home() {
         setAircraft(aircraftData);
         setError(null);
 
-        // Update selected aircraft with fresh data
-        if (selectedAircraft) {
-          const updated = aircraftData.find((ac: Aircraft) => ac.hex === selectedAircraft.hex);
+        // Update selected aircraft with fresh data from ref
+        const selectedHex = selectedHexRef.current;
+        if (selectedHex) {
+          const updated = aircraftData.find((ac: Aircraft) => ac.hex === selectedHex);
           if (updated) {
             setSelectedAircraft(updated);
           } else {
             // Aircraft disappeared, clear selection
             setSelectedAircraft(null);
             setSelectedTrail([]);
+            selectedHexRef.current = null;
           }
         }
 
@@ -84,7 +87,7 @@ export default function Home() {
     const interval = setInterval(fetchAircraft, 2500);
 
     return () => clearInterval(interval);
-  }, [selectedAircraft]);
+  }, []);
 
   useEffect(() => {
     if (!militaryEnabled) {
@@ -155,11 +158,13 @@ export default function Home() {
 
   const handleSelectAircraft = (aircraft: Aircraft) => {
     setSelectedAircraft(aircraft);
+    selectedHexRef.current = aircraft.hex;
   };
 
   const handleCloseDetail = () => {
     setSelectedAircraft(null);
     setSelectedTrail([]);
+    selectedHexRef.current = null;
   };
 
   // Filter aircraft based on search and military
