@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "npx --yes tsx --test app/lib/routePlausibility.test.ts app/lib/routes.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

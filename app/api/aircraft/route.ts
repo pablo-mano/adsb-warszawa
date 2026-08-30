@@ -149,9 +149,14 @@ export async function GET() {
       scheduleRouteLookups(
         normalized
           .filter((ac) => isFlightCallsign(ac.callsign, ac.reg))
-          .map((ac) => ac.callsign!)
+          .map((ac) => ({
+            callsign: ac.callsign!,
+            lat: ac.lat,
+            lon: ac.lon,
+            track: ac.track,
+          }))
       );
-      await waitForLookups(800);
+      await waitForLookups(1200);
       const withRoutes = attachCachedRoutes(normalized);
 
       // Upsert positions to DB (non-blocking, no failure propagation)
