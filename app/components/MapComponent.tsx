@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Tooltip, Polyline, Circle, CircleMarke
 import 'leaflet/dist/leaflet.css';
 import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
 import { typeDisplayName } from '../lib/aircraftTypes';
+import { greatCircle, haversineKm } from '../lib/geo';
 
 export interface Aircraft {
   hex: string;
@@ -23,6 +24,12 @@ export interface Aircraft {
   src?: string;
   seen?: number;
   dstNm?: number;
+  destIcao?: string;
+  destIata?: string;
+  destName?: string;
+  destLat?: number;
+  destLon?: number;
+  originIata?: string;
 }
 
 interface TrailPoint {
@@ -629,6 +636,62 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Data: <a href="https://adsb.fi/">adsb.fi</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        {aircraft.map((ac) => {
+          if (
+            ac.destLat == null ||
+            ac.destLon == null ||
+            !Number.isFinite(ac.destLat) ||
+            !Number.isFinite(ac.destLon)
+          ) {
+            return null;
+          }
+          const distKm = haversineKm(ac.lat, ac.lon, ac.destLat, ac.destLon);
+          if (distKm < 2) return null;
+          if (ac.onGround && distKm < 20) return null;
+
+          const isSelected = selectedAircraft?.hex === ac.hex;
+          const destLabel = ac.destIata || ac.destIcao;
+          return (
+            <Polyline
+              key={`dest-${ac.hex}`}
+              positions={greatCircle(ac.lat, ac.lon, ac.destLat, ac.destLon)}
+              pathOptions={{
+                color: '#111111',
+                weight: isSelected ? 2 : 1.25,
+                opacity: isSelected ? 0.9 : 0.55,
+                dashArray: '7 6',
+                lineCap: 'round',
+              }}
+            >
+              {destLabel && (
+                <Tooltip sticky opacity={0.9}>
+                  <div className="text-xs">
+                    {(ac.callsign || ac.hex).trim()} → {destLabel}
+                    {ac.destName ? ` (${ac.destName})` : ''}
+                  </div>
+                </Tooltip>
+              )}
+            </Polyline>
+          );
+        })}
+        {selectedAircraft?.destLat != null && selectedAircraft.destLon != null && (
+          <CircleMarker
+            center={[selectedAircraft.destLat, selectedAircraft.destLon]}
+            radius={5}
+            pathOptions={{
+              color: '#111111',
+              fillColor: '#111111',
+              fillOpacity: 0.85,
+              weight: 1,
+            }}
+          >
+            <Tooltip permanent direction="right" offset={[8, 0]} opacity={0.95}>
+              <div className="text-xs font-medium">
+                {selectedAircraft.destIata || selectedAircraft.destIcao || 'Cel'}
+              </div>
+            </Tooltip>
+          </CircleMarker>
+        )}
         <LocateControl
           onLocationUpdate={handleLocationUpdate}
           onStatusChange={handleStatusChange}
@@ -683,6 +746,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
                     <div className="font-bold">{ac.callsign || ac.hex}</div>
                     {typeDisplayName(ac.typeCode) && <div>{typeDisplayName(ac.typeCode)}</div>}
                     {ac.alt !== undefined && !ac.onGround && <div>{ac.alt} ft</div>}
+                    {(ac.destIata || ac.destIcao) && (
+                      <div>→ {ac.destIata || ac.destIcao}{ac.destName ? ` ${ac.destName}` : ''}</div>
+                    )}
                   </div>
                 </Tooltip>
               </Marker>

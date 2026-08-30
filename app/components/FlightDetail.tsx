@@ -56,6 +56,10 @@ export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
           <DetailRow label="Squawk" value={aircraft.squawk} />
           <DetailRow label="Lat / Lon" value={`${aircraft.lat.toFixed(4)} / ${aircraft.lon.toFixed(4)}`} />
           <DetailRow 
+            label="Cel" 
+            value={formatDestination(aircraft)} 
+          />
+          <DetailRow 
             label="Od EPWA" 
             value={aircraft.dstNm !== undefined ? `${aircraft.dstNm} NM` : undefined} 
           />
@@ -71,6 +75,13 @@ export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
       </div>
     </div>
   );
+}
+
+function formatDestination(aircraft: Aircraft): string | undefined {
+  const code = aircraft.destIata || aircraft.destIcao;
+  if (!code && !aircraft.destName) return undefined;
+  if (code && aircraft.destName) return `${code} · ${aircraft.destName}`;
+  return code || aircraft.destName;
 }
 
 function formatSource(src: string): string {

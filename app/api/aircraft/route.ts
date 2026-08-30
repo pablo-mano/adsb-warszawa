@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { upsertPositions, purgeOldPositions, type PositionRow } from '@/app/lib/db';
+import { attachCachedRoutes, isFlightCallsign, scheduleRouteLookups, waitForLookups } from '@/app/lib/routes';
 
 interface RawAircraft {
   hex?: string;
@@ -37,6 +38,12 @@ interface NormalizedAircraft {
   src?: string;
   seen?: number;
   dstNm?: number;
+  destIcao?: string;
+  destIata?: string;
+  destName?: string;
+  destLat?: number;
+  destLon?: number;
+  originIata?: string;
 }
 
 // 250 NM is the adsb.fi / adsb.lol max circle. From EPWA that covers
@@ -131,6 +138,14 @@ export async function GET() {
         .map(ac => normalizeAircraft(ac, nowSeconds))
         .filter((a): a is NormalizedAircraft => a !== null);
 
+      scheduleRouteLookups(
+        normalized
+          .filter((ac) => isFlightCallsign(ac.callsign, ac.reg))
+          .map((ac) => ac.callsign!)
+      );
+      await waitForLookups(800);
+      const withRoutes = attachCachedRoutes(normalized);
+
       // Upsert positions to DB (non-blocking, no failure propagation)
       const positionsToStore: PositionRow[] = normalized
         .filter(ac => ac.hex && ac.lat != null && ac.lon != null && ac.ts != null)
@@ -156,8 +171,8 @@ export async function GET() {
 
       return NextResponse.json(
         { 
-          aircraft: normalized, 
-          count: normalized.length,
+          aircraft: withRoutes, 
+          count: withRoutes.length,
           source,
           now: nowSeconds
         },
