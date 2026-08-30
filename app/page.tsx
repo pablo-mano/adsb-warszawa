@@ -407,20 +407,20 @@ export default function Home() {
 
           {/* Mobile Filter Bottom Sheet - over list only */}
           {filterPanelOpen && !selectedAircraft && (
-            <div className="md:hidden absolute inset-0 z-50 pointer-events-none flex flex-col">
-              {/* Backdrop */}
-              <div 
-                className="absolute inset-0 bg-black/20 pointer-events-auto"
+            <div className="md:hidden absolute inset-0 z-50 flex flex-col">
+              <div
+                className="absolute inset-0 bg-black/20"
                 onClick={() => setFilterPanelOpen(false)}
               />
-              {/* Sheet - use flex structure to prevent clipping */}
-              <div className="mt-auto bg-white rounded-t-xl shadow-xl pointer-events-auto flex flex-col max-h-full">
-                <FilterPanel
-                  filters={filters}
-                  onFiltersChange={setFilters}
-                  aircraft={aircraft}
-                  onClose={() => setFilterPanelOpen(false)}
-                />
+              <div className="relative z-10 h-full min-h-0 flex flex-col">
+                <div className="mt-auto w-full min-h-0 max-h-full overflow-hidden flex flex-col bg-white rounded-t-xl shadow-xl">
+                  <FilterPanel
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    aircraft={aircraft}
+                    onClose={() => setFilterPanelOpen(false)}
+                  />
+                </div>
               </div>
             </div>
           )}

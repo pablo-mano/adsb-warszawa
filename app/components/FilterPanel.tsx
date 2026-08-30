@@ -33,7 +33,7 @@ export default function FilterPanel({
   ).sort();
 
   return (
-    <div className="flex flex-col max-h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header for mobile - sticky at top */}
       {onClose && (
         <div className="flex-shrink-0 sticky top-0 bg-white z-10 px-4 pt-4 pb-3 border-b border-zinc-200">
