@@ -28,3 +28,13 @@ body {
     display: none !important;
   }
 }
+
+/* User GPS marker: keep Leaflet path overlays fully colored on grayscale tiles */
+.user-location-accuracy,
+.user-location-dot {
+  pointer-events: none;
+}
+
+.locate-control-button:disabled {
+  cursor: default;
+}

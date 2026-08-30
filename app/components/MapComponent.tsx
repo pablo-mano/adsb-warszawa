@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, Polyline, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, Polyline, Circle, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { colorByAlt, getAltitudeLegendGradient } from '../lib/colorByAlt';
 import { typeDisplayName } from '../lib/aircraftTypes';
@@ -38,6 +38,12 @@ interface MapComponentProps {
   onSelectAircraft: (aircraft: Aircraft) => void;
   selectedTrail: TrailPoint[];
   trailHistory: Map<string, TrailPoint[]>;
+}
+
+interface LabelControlProps {
+  isMobile: boolean;
+  labelsEnabled: boolean;
+  onToggle: () => void;
 }
 
 // Compute heading from two lat/lon points (returns degrees, 0° = north)
@@ -96,7 +102,12 @@ function calculateAircraftHeading(points: TrailPoint[]): number | null {
 }
 
 // Guard Leaflet usage for SSR/first load
-const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, isMobile: boolean = false) => {
+const createAircraftIcon = (
+  rotation: number = 0, 
+  isSelected: boolean = false, 
+  isMobile: boolean = false,
+  label: string | null = null
+) => {
   try {
     // Dynamic import L only on client
     const L = require('leaflet');
@@ -109,8 +120,25 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
       : (isSelected ? 40 : 32);
     const anchor = size / 2; // Center anchor
     
+    // Label styling
+    const labelFontSize = isMobile ? '10px' : '11px';
+    const labelStyle = label 
+      ? `position: absolute; left: ${size + 4}px; top: 50%; transform: translateY(-50%); 
+         font-size: ${labelFontSize}; font-family: system-ui, -apple-system, sans-serif; 
+         color: #18181b; font-weight: 500; white-space: nowrap; pointer-events: none;
+         text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+                      -2px 0 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, 0 2px 0 #fff;`
+      : '';
+    
     // Twemoji airplane glyph (U+2708) - faces upper-right / NE at 0°
-    const html = `<img src="/twemoji-2708.svg" width="${size}" height="${size}" style="transform: rotate(${rotation}deg); transform-origin: center center;" alt="✈" />`;
+    // Wrap in a container div with position:relative so label can be absolutely positioned
+    const html = `
+      <div style="position: relative; width: ${size}px; height: ${size}px;">
+        <img src="/twemoji-2708.svg" width="${size}" height="${size}" 
+             style="transform: rotate(${rotation}deg); transform-origin: center center; display: block;" alt="✈" />
+        ${label ? `<span style="${labelStyle}">${label}</span>` : ''}
+      </div>
+    `;
     
     return L.divIcon({
       html: html,
@@ -124,8 +152,6 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
     return undefined;
   }
 };
-
-// Removed auto-panning: map stays where user left it
 
 // Desktop altitude legend component
 function AltitudeLegend() {
@@ -178,6 +204,131 @@ function AltitudeLegend() {
   return null;
 }
 
+// Label toggle control component
+function LabelControl({ isMobile, labelsEnabled, onToggle }: LabelControlProps) {
+  const map = useMap();
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!map || typeof window === 'undefined') return;
+
+    try {
+      const L = require('leaflet');
+      
+      const LabelToggleControl = L.Control.extend({
+        onAdd: function() {
+          const button = L.DomUtil.create('button', 'label-toggle-control');
+          buttonRef.current = button;
+          
+          // Styling for 44px hit area
+          button.style.background = 'white';
+          button.style.border = '2px solid rgba(0,0,0,0.2)';
+          button.style.borderRadius = '4px';
+          button.style.width = '44px';
+          button.style.height = '44px';
+          button.style.display = 'flex';
+          button.style.alignItems = 'center';
+          button.style.justifyContent = 'center';
+          button.style.cursor = 'pointer';
+          button.style.fontSize = '18px';
+          button.style.fontWeight = '600';
+          button.style.transition = 'background-color 0.15s';
+          button.title = 'Etykiety';
+          button.innerHTML = '🏷️';
+          
+          // Prevent map interactions when clicking the button
+          L.DomEvent.disableClickPropagation(button);
+          L.DomEvent.disableScrollPropagation(button);
+          
+          button.onclick = (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggle();
+          };
+          
+          return button;
+        }
+      });
+
+      const labelControl = new LabelToggleControl({ position: 'topright' });
+      labelControl.addTo(map);
+
+      return () => {
+        labelControl.remove();
+      };
+    } catch (error) {
+      console.error('Error creating label control:', error);
+    }
+  }, [map, onToggle, isMobile]);
+
+  // Update button appearance when labelsEnabled changes
+  useEffect(() => {
+    if (buttonRef.current) {
+      if (labelsEnabled) {
+        buttonRef.current.style.backgroundColor = '#2563eb';
+        buttonRef.current.style.color = 'white';
+        buttonRef.current.style.borderColor = '#2563eb';
+      } else {
+        buttonRef.current.style.backgroundColor = 'white';
+        buttonRef.current.style.color = '#3f3f46';
+        buttonRef.current.style.borderColor = 'rgba(0,0,0,0.2)';
+      }
+    }
+  }, [labelsEnabled]);
+
+  return null;
+}
+
+// Component to track zoom level
+function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    const handleZoom = () => {
+      onZoomChange(map.getZoom());
+    };
+
+    // Set initial zoom
+    handleZoom();
+
+    map.on('zoomend', handleZoom);
+    return () => {
+      map.off('zoomend', handleZoom);
+    };
+  }, [map, onZoomChange]);
+
+  return null;
+}
+
+// Component to follow selected aircraft
+function FollowSelectedAircraft({
+  selectedAircraft,
+  suppressFollow,
+}: {
+  selectedAircraft: Aircraft | null;
+  suppressFollow: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (suppressFollow) return;
+    if (!map || !selectedAircraft || selectedAircraft.lat == null || selectedAircraft.lon == null) {
+      return;
+    }
+
+    // Recenter map on selected aircraft, preserving current zoom
+    const currentZoom = map.getZoom();
+    map.setView([selectedAircraft.lat, selectedAircraft.lon], currentZoom, {
+      animate: true,
+      duration: 0.25,
+    });
+  }, [map, selectedAircraft, suppressFollow]);
+
+  return null;
+}
+
 // User location types
 type LocationStatus = 'idle' | 'pending' | 'granted' | 'error';
 
@@ -187,9 +338,8 @@ interface UserLocation {
   accuracy: number;
 }
 
-// Locate control component
 interface LocateControlProps {
-  onLocationUpdate: (location: UserLocation) => void;
+  onLocationUpdate: (location: UserLocation | null) => void;
   onStatusChange: (status: LocationStatus) => void;
   isMobile: boolean;
 }
@@ -197,18 +347,22 @@ interface LocateControlProps {
 function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateControlProps) {
   const map = useMap();
   const [status, setStatus] = useState<LocationStatus>('idle');
-  const controlRef = useRef<any>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const statusRef = useRef<LocationStatus>('idle');
+  const handleLocateRef = useRef<() => void>(() => {});
+  const [controlMounted, setControlMounted] = useState(false);
 
   const updateStatus = useCallback((newStatus: LocationStatus) => {
+    statusRef.current = newStatus;
     setStatus(newStatus);
     onStatusChange(newStatus);
   }, [onStatusChange]);
 
   const handleLocate = useCallback(() => {
-    if (status === 'pending') return;
-    
+    if (statusRef.current === 'pending') return;
+
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      onLocationUpdate(null);
       updateStatus('error');
       return;
     }
@@ -220,16 +374,17 @@ function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateCon
         const location: UserLocation = {
           lat: position.coords.latitude,
           lon: position.coords.longitude,
-          accuracy: position.coords.accuracy,
+          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : 50,
         };
         onLocationUpdate(location);
         updateStatus('granted');
-        
-        // Pan to user location once
+
+        // One-shot pan to user location; do not watch or keep following
         map.setView([location.lat, location.lon], map.getZoom());
       },
       (error) => {
         console.error('Geolocation error:', error);
+        onLocationUpdate(null);
         updateStatus('error');
       },
       {
@@ -238,20 +393,24 @@ function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateCon
         maximumAge: 0,
       }
     );
-  }, [status, updateStatus, onLocationUpdate, map]);
+  }, [updateStatus, onLocationUpdate, map]);
+
+  handleLocateRef.current = handleLocate;
 
   useEffect(() => {
     if (!map || typeof window === 'undefined') return;
 
     try {
       const L = require('leaflet');
-      
+
       const LocateControlClass = L.Control.extend({
         onAdd: function() {
           const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
           const button = L.DomUtil.create('button', 'locate-control-button', container);
-          buttonRef.current = button;
-          
+          buttonRef.current = button as HTMLButtonElement;
+          button.type = 'button';
+          button.setAttribute('aria-label', 'Pokaż moją lokalizację');
+
           // 44px on mobile (390px viewport), 34px on desktop
           const size = isMobile ? 44 : 34;
           button.style.width = `${size}px`;
@@ -265,108 +424,134 @@ function LocateControl({ onLocationUpdate, onStatusChange, isMobile }: LocateCon
           button.style.justifyContent = 'center';
           button.style.padding = '0';
           button.style.transition = 'background-color 0.2s';
-          
-          // Prevent map interactions when clicking the button
+
           L.DomEvent.disableClickPropagation(button);
-          L.DomEvent.on(button, 'click', handleLocate);
-          
+          L.DomEvent.disableScrollPropagation(button);
+          L.DomEvent.on(button, 'click', (e: Event) => {
+            L.DomEvent.preventDefault(e);
+            handleLocateRef.current();
+          });
+
           return container;
         },
         onRemove: function() {
           if (buttonRef.current) {
-            L.DomEvent.off(buttonRef.current, 'click', handleLocate);
+            L.DomEvent.off(buttonRef.current, 'click');
           }
         }
       });
 
-      controlRef.current = new LocateControlClass({ position: 'topright' });
-      controlRef.current.addTo(map);
+      const control = new LocateControlClass({ position: 'topright' });
+      control.addTo(map);
+      setControlMounted(true);
 
       return () => {
-        if (controlRef.current) {
-          controlRef.current.remove();
-        }
+        setControlMounted(false);
+        control.remove();
       };
     } catch (error) {
       console.error('Error creating locate control:', error);
     }
-  }, [map, isMobile, handleLocate]);
+  }, [map, isMobile]);
 
-  // Update button appearance based on status
+  // Update button appearance based on status without remounting the control
   useEffect(() => {
     if (!buttonRef.current) return;
 
     const button = buttonRef.current;
-    const size = isMobile ? 44 : 34;
     const iconSize = isMobile ? 22 : 18;
-    
-    // Clear previous content
+
     button.innerHTML = '';
-    
+
     if (status === 'error') {
       button.style.backgroundColor = '#fee2e2';
-      button.style.color = '#dc2626';
+      button.disabled = false;
       button.title = 'Brak zgody na lokalizację';
-      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: invert(15%) sepia(89%) saturate(5074%) hue-rotate(356deg) brightness(87%) contrast(93%);" alt="locate" />`;
+      button.setAttribute('aria-label', 'Brak zgody na lokalizację');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: invert(15%) sepia(89%) saturate(5074%) hue-rotate(356deg) brightness(87%) contrast(93%);" alt="" />`;
     } else if (status === 'pending') {
       button.style.backgroundColor = '#e5e7eb';
-      button.style.color = '#6b7280';
       button.disabled = true;
       button.title = 'Pobieranie lokalizacji...';
-      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: grayscale(100%);" alt="locate" />`;
+      button.setAttribute('aria-label', 'Pobieranie lokalizacji...');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: grayscale(100%);" alt="" />`;
     } else if (status === 'granted') {
       button.style.backgroundColor = 'white';
-      button.style.color = '#3b82f6';
       button.disabled = false;
       button.title = 'Odśwież lokalizację';
-      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: invert(45%) sepia(88%) saturate(1945%) hue-rotate(202deg) brightness(101%) contrast(93%);" alt="locate" />`;
+      button.setAttribute('aria-label', 'Odśwież lokalizację');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" style="filter: invert(45%) sepia(88%) saturate(1945%) hue-rotate(202deg) brightness(101%) contrast(93%);" alt="" />`;
     } else {
       button.style.backgroundColor = 'white';
-      button.style.color = '#374151';
       button.disabled = false;
       button.title = 'Pokaż moją lokalizację';
-      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" alt="locate" />`;
+      button.setAttribute('aria-label', 'Pokaż moją lokalizację');
+      button.innerHTML = `<img src="/locate-icon.svg" width="${iconSize}" height="${iconSize}" alt="" />`;
     }
-  }, [status, isMobile]);
+  }, [status, isMobile, controlMounted]);
 
   return null;
 }
 
-// Create user location marker icon (blue dot with white stroke)
-const createUserLocationIcon = () => {
-  try {
-    const L = require('leaflet');
-    
-    const html = `
-      <div style="
-        width: 16px;
-        height: 16px;
-        background-color: #3b82f6;
-        border: 3px solid white;
-        border-radius: 50%;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-      "></div>
-    `;
-    
-    return L.divIcon({
-      html: html,
-      className: 'user-location-marker',
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
-    });
-  } catch (error) {
-    console.error('Error creating user location icon:', error);
-    return undefined;
-  }
-};
+function UserLocationLayer({ location }: { location: UserLocation }) {
+  const accuracy = Math.max(location.accuracy, 15);
+
+  return (
+    <>
+      <Circle
+        className="user-location-accuracy"
+        center={[location.lat, location.lon]}
+        radius={accuracy}
+        pathOptions={{
+          color: '#3b82f6',
+          fillColor: '#3b82f6',
+          fillOpacity: 0.15,
+          weight: 2,
+          opacity: 0.55,
+        }}
+      />
+      <CircleMarker
+        className="user-location-dot"
+        center={[location.lat, location.lon]}
+        radius={8}
+        pathOptions={{
+          color: '#ffffff',
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          weight: 3,
+          opacity: 1,
+        }}
+      />
+    </>
+  );
+}
 
 export default function MapComponent({ aircraft, selectedAircraft, onSelectAircraft, selectedTrail, trailHistory }: MapComponentProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [labelsEnabled, setLabelsEnabled] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(9);
   const lastKnownHeadingRef = useRef<Map<string, number>>(new Map());
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
+  const [followSuppressed, setFollowSuppressed] = useState(false);
+
+  const handleLocationUpdate = useCallback((location: UserLocation | null) => {
+    setUserLocation(location);
+    if (location) {
+      // Keep follow-selected from yanking the map away from the one-shot GPS pan
+      setFollowSuppressed(true);
+    }
+  }, []);
+
+  const handleStatusChange = useCallback((_status: LocationStatus) => {
+    // Status is owned by LocateControl for the button; parent only needs coords.
+  }, []);
+
+  const handleSelectAircraft = useCallback((ac: Aircraft) => {
+    setFollowSuppressed(false);
+    onSelectAircraft(ac);
+  }, [onSelectAircraft]);
 
   useEffect(() => {
     setMounted(true);
@@ -421,9 +606,9 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Data: <a href="https://adsb.fi/">adsb.fi</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <LocateControl 
-          onLocationUpdate={setUserLocation} 
-          onStatusChange={setLocationStatus}
+        <LocateControl
+          onLocationUpdate={handleLocationUpdate}
+          onStatusChange={handleStatusChange}
           isMobile={isMobile}
         />
         {aircraft.map((ac) => {
@@ -447,7 +632,14 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             
             // Apply rotation: Twemoji glyph faces upper-right / NE at 0°, so subtract 45°
             const rotation = heading - 45;
-            const icon = createAircraftIcon(rotation, isSelected, isMobile);
+            
+            // Label logic:
+            // - Always show for selected aircraft
+            // - For others: only if labelsEnabled AND zoom >= 9
+            const shouldShowLabel = isSelected || (labelsEnabled && currentZoom >= 9);
+            const labelText = shouldShowLabel ? (ac.callsign || ac.hex) : null;
+            
+            const icon = createAircraftIcon(rotation, isSelected, isMobile, labelText);
             return (
               <Marker
                 key={ac.hex}
@@ -456,7 +648,7 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
                 eventHandlers={{
                   click: () => {
                     try {
-                      onSelectAircraft(ac);
+                      handleSelectAircraft(ac);
                     } catch (error) {
                       console.error('Error selecting aircraft:', error);
                     }
@@ -477,34 +669,18 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             return null;
           }
         })}
-        {userLocation && locationStatus === 'granted' && (() => {
-          try {
-            const icon = createUserLocationIcon();
-            return (
-              <>
-                <Circle
-                  center={[userLocation.lat, userLocation.lon]}
-                  radius={userLocation.accuracy}
-                  pathOptions={{
-                    color: '#3b82f6',
-                    fillColor: '#3b82f6',
-                    fillOpacity: 0.1,
-                    weight: 1,
-                    opacity: 0.3,
-                  }}
-                />
-                <Marker
-                  position={[userLocation.lat, userLocation.lon]}
-                  icon={icon}
-                />
-              </>
-            );
-          } catch (error) {
-            console.error('Error rendering user location:', error);
-            return null;
-          }
-        })()}
+        {userLocation && <UserLocationLayer location={userLocation} />}
         {selectedAircraft && selectedTrail.length >= 2 && !isMobile && <AltitudeLegend />}
+        <ZoomTracker onZoomChange={setCurrentZoom} />
+        <LabelControl 
+          isMobile={isMobile} 
+          labelsEnabled={labelsEnabled} 
+          onToggle={() => setLabelsEnabled(!labelsEnabled)} 
+        />
+        <FollowSelectedAircraft
+          selectedAircraft={selectedAircraft}
+          suppressFollow={followSuppressed}
+        />
         {selectedTrail.length >= 2 && (() => {
           try {
             const positions: [number, number][] = selectedTrail.map(p => [p.lat, p.lon]);
