@@ -1,77 +1,56 @@
 'use client';
 
 import { Aircraft } from './MapComponent';
+import { typeDisplayName } from '../lib/aircraftTypes';
 
 interface FlightDetailProps {
-  aircraft: Aircraft | null;
+  aircraft: Aircraft;
+  onClose: () => void;
 }
 
-export default function FlightDetail({ aircraft }: FlightDetailProps) {
-  if (!aircraft) {
-    return (
-      <div className="h-full bg-white p-6 flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <div className="text-4xl mb-2">✈️</div>
-          <p>Wybierz samolot, aby zobaczyć szczegóły</p>
-        </div>
-      </div>
-    );
-  }
-
+export default function FlightDetail({ aircraft, onClose }: FlightDetailProps) {
   return (
-    <div className="h-full overflow-y-auto bg-white p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {aircraft.callsign || 'Bez znaku'}
-        </h2>
-        <div className="text-sm text-gray-500">ICAO: {aircraft.hex.toUpperCase()}</div>
+    <div className="h-full flex flex-col bg-white">
+      {/* Header with X button */}
+      <div className="flex-shrink-0 p-4 border-b border-zinc-200">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {aircraft.callsign || aircraft.hex.toUpperCase()}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 w-11 h-11 -mt-1 -mr-1 flex items-center justify-center text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div className="space-y-4">
-        <DetailRow label="Rejestracja" value={aircraft.reg} />
-        <DetailRow label="Typ statku" value={aircraft.typeCode} />
-        
-        <div className="border-t pt-4">
-          <h3 className="font-semibold text-gray-900 mb-3">Pozycja</h3>
-          <DetailRow label="Szerokość" value={aircraft.lat.toFixed(4)} />
-          <DetailRow label="Długość" value={aircraft.lon.toFixed(4)} />
-        </div>
-
-        <div className="border-t pt-4">
-          <h3 className="font-semibold text-gray-900 mb-3">Lot</h3>
-          {aircraft.onGround ? (
-            <div className="bg-orange-50 border border-orange-200 rounded p-3 text-orange-800">
-              <span className="font-medium">Na ziemi</span>
-            </div>
-          ) : (
-            <>
-              <DetailRow 
-                label="Wysokość (baro)" 
-                value={aircraft.alt !== undefined ? `${aircraft.alt} ft` : undefined} 
-              />
-              <DetailRow 
-                label="Wysokość (geom)" 
-                value={aircraft.altGeom !== undefined ? `${aircraft.altGeom} ft` : undefined} 
-              />
-            </>
-          )}
+      {/* Detail content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-3">
+          <DetailRow label="Hex" value={aircraft.hex.toUpperCase()} />
+          <DetailRow label="Rejestracja" value={aircraft.reg} />
+          <DetailRow label="Typ" value={typeDisplayName(aircraft.typeCode)} />
           <DetailRow 
-            label="Prędkość naziemna" 
+            label="Wysokość" 
+            value={aircraft.onGround ? 'Na ziemi' : (aircraft.alt !== undefined ? `${aircraft.alt} ft` : undefined)} 
+          />
+          <DetailRow 
+            label="Prędkość" 
             value={aircraft.gs !== undefined ? `${aircraft.gs} kt` : undefined} 
           />
-          <DetailRow 
-            label="Kurs" 
-            value={aircraft.track !== undefined ? `${aircraft.track}°` : undefined} 
-          />
           <DetailRow label="Squawk" value={aircraft.squawk} />
-        </div>
-
-        <div className="border-t pt-4">
-          <h3 className="font-semibold text-gray-900 mb-3">Techniczne</h3>
-          <DetailRow label="Źródło" value={aircraft.src} />
+          <DetailRow label="Lat" value={aircraft.lat.toFixed(4)} />
+          <DetailRow label="Lon" value={aircraft.lon.toFixed(4)} />
           <DetailRow 
             label="Widziano" 
-            value={aircraft.seen !== undefined ? `${aircraft.seen.toFixed(1)}s temu` : undefined} 
+            value={aircraft.seen !== undefined ? `${Math.floor(aircraft.seen)}s temu` : undefined} 
           />
         </div>
       </div>
@@ -85,8 +64,8 @@ function DetailRow({ label, value }: { label: string; value?: string | number })
   }
 
   return (
-    <div className="flex justify-between py-2">
-      <span className="text-gray-600">{label}:</span>
+    <div className="flex justify-between py-2 text-sm">
+      <span className="text-zinc-600">{label}</span>
       <span className="font-medium text-gray-900">{value}</span>
     </div>
   );

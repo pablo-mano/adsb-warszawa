@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import FlightList from './components/FlightList';
+import FlightDetail from './components/FlightDetail';
 import { Aircraft } from './components/MapComponent';
 import { getAltitudeLegendGradient } from './lib/colorByAlt';
 
@@ -45,6 +46,18 @@ export default function Home() {
         setAircraft(aircraftData);
         setError(null);
 
+        // Update selected aircraft with fresh data
+        if (selectedAircraft) {
+          const updated = aircraftData.find((ac: Aircraft) => ac.hex === selectedAircraft.hex);
+          if (updated) {
+            setSelectedAircraft(updated);
+          } else {
+            // Aircraft disappeared, clear selection
+            setSelectedAircraft(null);
+            setSelectedTrail([]);
+          }
+        }
+
         // Update trail history for all aircraft with valid positions
         const now = Math.floor(Date.now() / 1000);
         const oneHourAgo = now - 3600;
@@ -71,7 +84,7 @@ export default function Home() {
     const interval = setInterval(fetchAircraft, 2500);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedAircraft]);
 
   useEffect(() => {
     if (!militaryEnabled) {
@@ -144,6 +157,11 @@ export default function Home() {
     setSelectedAircraft(aircraft);
   };
 
+  const handleCloseDetail = () => {
+    setSelectedAircraft(null);
+    setSelectedTrail([]);
+  };
+
   // Filter aircraft based on search and military
   const filteredAircraft = aircraft.filter((ac) => {
     // Apply search filter
@@ -170,13 +188,6 @@ export default function Home() {
     return true;
   });
 
-  // Deselect aircraft if it's no longer in the filtered set
-  useEffect(() => {
-    if (selectedAircraft && !filteredAircraft.some(ac => ac.hex === selectedAircraft.hex)) {
-      setSelectedAircraft(null);
-      setSelectedTrail([]);
-    }
-  }, [filteredAircraft, selectedAircraft]);
 
   return (
     <div className="h-screen flex flex-col bg-zinc-50">
@@ -218,54 +229,65 @@ export default function Home() {
           />
         </div>
 
-        {/* Mobile Filter Toolbar - between map and list, normal flow */}
-        <div className="md:hidden flex-shrink-0 bg-white border-t border-zinc-200">
-          <div className="p-3">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Callsign, hex, rej, typ"
-                className="flex-1 px-3 py-2 text-sm border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                onClick={() => setMilitaryEnabled(!militaryEnabled)}
-                className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
-                  militaryEnabled
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                Wojskowe
-              </button>
+        {/* Mobile Filter Toolbar - between map and list, hidden when aircraft selected */}
+        {!selectedAircraft && (
+          <div className="md:hidden flex-shrink-0 bg-white border-t border-zinc-200">
+            <div className="p-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Callsign, hex, rej, typ"
+                  className="flex-1 px-3 py-2 text-sm border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button
+                  onClick={() => setMilitaryEnabled(!militaryEnabled)}
+                  className={`flex-shrink-0 px-3 py-2 text-xs font-medium rounded-full transition-colors whitespace-nowrap ${
+                    militaryEnabled
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                  }`}
+                >
+                  Wojskowe
+                </button>
+              </div>
             </div>
           </div>
-          {/* Mobile altitude legend - 4px bar when aircraft selected */}
-          {selectedAircraft && selectedTrail.length >= 2 && (
-            <div 
-              style={{ 
-                height: '4px', 
-                background: getAltitudeLegendGradient() 
-              }}
+        )}
+
+        {/* Mobile altitude legend - 4px bar when aircraft selected */}
+        {selectedAircraft && selectedTrail.length >= 2 && (
+          <div 
+            className="md:hidden flex-shrink-0"
+            style={{ 
+              height: '4px', 
+              background: getAltitudeLegendGradient() 
+            }}
+          />
+        )}
+
+        {/* List or Detail - quiet card/column, 340px on desktop */}
+        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-zinc-200 min-h-0 overflow-hidden">
+          {selectedAircraft ? (
+            <FlightDetail
+              aircraft={selectedAircraft}
+              onClose={handleCloseDetail}
+            />
+          ) : (
+            <FlightList
+              aircraft={filteredAircraft}
+              selectedAircraft={selectedAircraft}
+              onSelectAircraft={handleSelectAircraft}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              militaryEnabled={militaryEnabled}
+              onMilitaryToggle={() => setMilitaryEnabled(!militaryEnabled)}
+              militaryLoaded={militaryLoaded}
+              hasSearchQuery={searchQuery.trim().length > 0}
+              showToolbar={true}
             />
           )}
-        </div>
-
-        {/* List - quiet card/column, 340px on desktop */}
-        <div className="flex-1 md:flex-none md:w-[340px] bg-white md:border-l border-zinc-200 min-h-0 overflow-hidden">
-          <FlightList
-            aircraft={filteredAircraft}
-            selectedAircraft={selectedAircraft}
-            onSelectAircraft={handleSelectAircraft}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            militaryEnabled={militaryEnabled}
-            onMilitaryToggle={() => setMilitaryEnabled(!militaryEnabled)}
-            militaryLoaded={militaryLoaded}
-            hasSearchQuery={searchQuery.trim().length > 0}
-            showToolbar={true}
-          />
         </div>
       </div>
 

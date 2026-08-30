@@ -125,19 +125,7 @@ const createAircraftIcon = (rotation: number = 0, isSelected: boolean = false, i
   }
 };
 
-function SelectedAircraftView({ aircraft }: { aircraft: Aircraft }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    try {
-      map.setView([aircraft.lat, aircraft.lon], map.getZoom(), { animate: true });
-    } catch (error) {
-      console.error('Error centering map:', error);
-    }
-  }, [aircraft, map]);
-  
-  return null;
-}
+// Removed auto-panning: map stays where user left it
 
 // Desktop altitude legend component
 function AltitudeLegend() {
@@ -300,7 +288,6 @@ export default function MapComponent({ aircraft, selectedAircraft, onSelectAircr
             return null;
           }
         })}
-        {selectedAircraft && <SelectedAircraftView aircraft={selectedAircraft} />}
         {selectedAircraft && selectedTrail.length >= 2 && !isMobile && <AltitudeLegend />}
         {selectedTrail.length >= 2 && (() => {
           try {
