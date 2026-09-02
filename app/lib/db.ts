@@ -75,7 +75,7 @@ export async function purgeOldPositions() {
 
   try {
     const now = Math.floor(Date.now() / 1000);
-    const cutoff = now - 86400;
+    const cutoff = now - 7200;
     await sql`DELETE FROM positions WHERE ts < ${cutoff}`;
   } catch (error) {
     console.error('Error purging old positions:', error);
