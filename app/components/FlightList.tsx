@@ -104,6 +104,7 @@ export default function FlightList({
           <div className="divide-y divide-zinc-100">
             {aircraft.map((ac) => {
               const isEmergency = isEmergencySquawk(ac.squawk);
+              const isMlat = ac.src?.trim().toLowerCase().startsWith('mlat') || false;
               return (
                 <div
                   key={ac.hex}
@@ -116,9 +117,16 @@ export default function FlightList({
                       : ''
                   }`}
                 >
-                  <div className="font-semibold text-gray-900 text-sm">
-                    {ac.callsign || ac.hex}
-                    {isEmergency && ac.squawk && `  ${ac.squawk}`}
+                  <div className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                    <span>
+                      {ac.callsign || ac.hex}
+                      {isEmergency && ac.squawk && `  ${ac.squawk}`}
+                    </span>
+                    {isMlat && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800">
+                        MLAT
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-zinc-600 mt-1 space-y-0.5">
                     {typeDisplayName(ac.typeCode) && <div className="truncate">{typeDisplayName(ac.typeCode)}</div>}

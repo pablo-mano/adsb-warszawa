@@ -99,11 +99,11 @@ function formatAirport(iata?: string, icao?: string, name?: string): string | un
 }
 
 function formatSource(src: string): string {
-  const lower = src.toLowerCase();
-  if (lower.includes('mlat')) {
+  const normalized = src.trim().toLowerCase();
+  if (normalized === 'mlat' || normalized.startsWith('mlat')) {
     return 'MLAT';
   }
-  if (lower.includes('adsb')) {
+  if (normalized === 'adsb_icao') {
     return 'ADS-B';
   }
   return src;
